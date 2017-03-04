@@ -35,14 +35,14 @@ cars-own [
   current-lane-id ; what lane ID am i in
   cooperativeness-rating ; how willing am i to let someone in my lane? ( 1 lowest -> 10 highest )
   next-lane ; what is his next choice?
-  
+  next-speed; 
   ;        conditions of the adjacent lanes
   
   ; are the lanes above and below even feasible?
   laneBelowFeasible
   laneAboveFeasible
   
-  ;        evaluations of my speed (must be updated each time a drive)
+  ; evaluations of my speed (must be updated each time a drive)
   abovePreferredSpeed
   belowPreferredSpeed
   
@@ -50,7 +50,12 @@ cars-own [
   wantFasterLane
   wantSlowerLane
   
-  ; TODO
+  ;        conditions of the adjacent vehicles
+  carAheadExists
+  carAheadSpeed
+  
+  ;TODO
+
 ]
 
 lanes-own [
@@ -138,10 +143,40 @@ lanes-own [
 ;*********************** Cars *********************************
      
       ; methods 
-      
       to evaluateConditions ; car procedure
-        
-        ; i want to know :
+        evaluateLaneConditions ; gives me info about what lanes i want and what is possible
+        evaluateAdjacentVehicleConditions ; gives me info about what vehicles are next to me
+      end
+        to evaluateAdjacentVehicleConditions ; car procedure
+          
+          ; who is in front of me
+          let carAhead 0
+          let carAhead-speed 0
+          
+          ifelse (any? vehicles-directly-ahead) [
+            set carAhead-speed  [ current-speed ] of vehicle-directly-ahead
+            set carAhead true
+          ] [
+            set carAhead-speed  0
+            set carAhead false
+          ]
+          
+          ; who is above me
+          
+          ; who is below me
+          set carAheadSpeed carAhead-speed
+          set carAheadExists carAhead       
+          
+          
+          
+          
+          
+          
+          
+        end
+              
+        to evaluateLaneConditions ; car procedure
+                  ; i want to know :
    
         ; are the lanes above or below me feasible?
         
@@ -174,12 +209,12 @@ lanes-own [
         ]
         
         ifelse preferred-speed > myLaneMax
-        [ set wantFasterLane false]
-        [ set wantFasterLane true ]  
+        [ set wantFasterLane true]
+        [ set wantFasterLane false ]  
         
-        ifelse preferred-speed < myLaneMin
-        [ set wantSlowerLane false]
-        [ set wantSlowerLane true ]  
+        ifelse (preferred-speed < myLaneMin)
+        [ set wantSlowerLane true]
+        [ set wantSlowerLane false ]  
         
         if debug [ 
           show "-- Car Evaluating Conditions --"
@@ -201,15 +236,23 @@ lanes-own [
           show wantFasterLane
           show "wantSlowerLane:" 
           show wantSlowerLane
-        ]       
-        
-      end
-        
-      to adjust-speed ; car procedure
+        ] 
+        end
+        to executeActions 
+          changeLanes
+          adjustSpeed
+        end
+ 
+          to adjustSpeed  ; car procedure
+            set current-speed next-speed
+            fd current-speed
+          end
 
-      end
         
- to change-lanes ; car procedure
+ to changeLanes ; car procedure
+   
+   ; changing lanes
+   
    	if debug [ 
         show "-- Car Changing Lanes --"
         show "From CurrentLane:" 
@@ -238,9 +281,23 @@ lanes-own [
         show "Lane is now: " 
         show current-lane
       ]
+   
   end
    
    
+   
+   ; get vehicles ahead of me
+   
+        to-report vehicles-directly-ahead
+          ifelse (agressive?) [
+            report cars-on patch-ahead 1
+          ] [
+            report (turtle-set (cars-on patch-ahead 1) (cars-on patch-ahead cardistance))
+          ]
+        end
+        to-report vehicle-directly-ahead
+          report one-of vehicles-directly-ahead
+        end
    
     ;*********************** End Cars *********************************
 
@@ -250,7 +307,7 @@ lanes-own [
 
 to setup
   clear-all
-  set debug true
+  set debug false
   setup-display
   setup-lanes ; do before cars, cars drive in lanes, duh
   setup-cars
@@ -281,30 +338,28 @@ to cars-drive
      show "---- New Driving Session  ----"
     ]
   
-  ; update all of my parameters
+  
   ask cars [
+    ; update all of my parameters
     evaluateConditions
+    
+    
+    
+    ; send out all of my arguments
+    
+
   ]  
-  
-  ; send out all of my arguments
-  
-  
   
   
   
   
   ; everyone should know what theyre doing by now
   
-  
-  
-  
-  
-  
-  
   ; let them do what they decided
   
-   ask cars [
-   ; change-lanes
+  ask cars [
+    ; finally, we do what we argued for
+    executeActions
   ]  
   
 end
@@ -374,9 +429,10 @@ to setup-traffic [ direction ]
         ] [
           set current-lane lane-slow-ypos
           set current-lane-id lane-slow
-
         ]
       ]
+      
+      set next-lane current-lane ; make him stay where he is for now
       
       if debug [ 
         show "---- Car Initialization ----"
