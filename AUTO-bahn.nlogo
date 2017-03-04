@@ -2,9 +2,9 @@ globals [
   loop-counter
   roads
   lane-ycord
-  lane-one
-  lane-two
-  lane-three
+  lane-fast
+  lane-medium
+  lane-slow
   max-speed-limit
   min-speed-limit
   lead-car
@@ -12,9 +12,10 @@ globals [
   prev-xcor
   prev-ycor
   car-ahead
-  lane-fast
-  lane-slow
-  lane-medium
+	lane-fast-ypos
+  lane-medium-ypos
+	lane-slow-ypos
+  debug
 ]
 
 breed [ dividers divider ]
@@ -23,7 +24,6 @@ breed [ lanes lanee ]
 
 cars-own [
   speed
-  lane
   previous-x
   agressive?
   
@@ -31,18 +31,28 @@ cars-own [
   
   current-speed ; what is my current speed
   preferred-speed ; what is my preferred speed ( 1 lowest -> 10 highest )
-  current-lane ; what lane i am in ( 3 fastest -> 2 -> 1 slowest) 
+  current-lane ; what lane POSITION i am in 
+  current-lane-id ; what lane ID am i in
   cooperativeness-rating ; how willing am i to let someone in my lane? ( 1 lowest -> 10 highest )
   next-lane ; what is his next choice?
   
-  ; conditions of the adjacent lanes
+  ;        conditions of the adjacent lanes
   
+  ; are the lanes above and below even feasible?
+  laneBelowFeasible
+  laneAboveFeasible
+  
+  ;        evaluations of my speed (must be updated each time a drive)
+  abovePreferredSpeed
+  belowPreferredSpeed
+  
+  ; based on my preferred speed, what lanes do i want?
+  wantFasterLane
+  wantSlowerLane
   
   ; TODO
 ]
 
-;*********************** Lanes *********************************
-  
 lanes-own [
   
   ; attributes
@@ -52,7 +62,9 @@ lanes-own [
   emission-rating ; cars traveling in this lane emit this for their emissions
   y-pos ; where are we on the y axis
 ]
-  
+
+;*********************** Lanes *********************************
+
   ; methods
 
   to update-lane ; lane procedure
@@ -64,7 +76,6 @@ lanes-own [
         if (pycor = laneY)
         [ set congestion congestion + 1 ]
       ]
-    show congestion
     set current-congestion congestion    
     
   end
@@ -83,9 +94,10 @@ lanes-own [
       
     to setup-lanes
       let line (max-pycor * 2 / 3)
-      set lane-one (min-pycor + (line / 2))
-      set lane-two 0
-      set lane-three (max-pycor - (line / 2))
+      
+      set lane-fast-ypos (min-pycor + (line / 2))
+      set lane-medium-ypos 0
+      set lane-slow-ypos (max-pycor - (line / 2))
       
 			create-lanes 3 [
         set current-congestion 0
@@ -101,21 +113,21 @@ lanes-own [
         set max-speed 10
         set min-speed 7
         set emission-rating 3
-        set y-pos lane-three
+        set y-pos lane-fast-ypos
       ] ; fast-lane
 
       ask lanee lane-medium [ 
         set max-speed 6
         set min-speed 4
         set emission-rating 2
-        set y-pos lane-two
+        set y-pos lane-medium-ypos
       ] ; medium-lane
       
       ask lanee lane-slow [ 
         set max-speed 3
         set min-speed 1
         set emission-rating 1
-        set y-pos lane-one
+        set y-pos lane-slow-ypos
       ] ; slow-lane
       
     end
@@ -123,8 +135,89 @@ lanes-own [
     
     ;*********************** End Lanes *********************************
 
+;*********************** Cars *********************************
+     
+      ; methods 
       
+      to evaluateConditions ; car procedure
+        
+        ; i want to know :
+   
+        ; are the lanes above or below me feasible?
+        
+        ifelse current-lane = lane-slow-ypos 
+        [ set laneBelowFeasible false]
+        [ set laneBelowFeasible true ]
+        
+        ifelse current-lane = lane-fast-ypos 
+        [ set laneAboveFeasible false]
+        [ set laneAboveFeasible true ]
+        
+        ; am i above or below my current speed?
+        
+        ifelse current-speed > preferred-speed
+        [ set abovePreferredSpeed true]
+        [ set abovePreferredSpeed false ]
+        
+        ifelse current-speed < preferred-speed
+        [ set belowPreferredSpeed true]
+        [ set belowPreferredSpeed false ]        
+        
+        ; are the speeds of this lane to my liking?
+        
+        let myLaneMax 0
+        let myLaneMin 0
+        
+        ask lanee current-lane-id [
+          set myLaneMax max-speed
+          set myLaneMin min-speed
+        ]
+        
+        ifelse preferred-speed > myLaneMax
+        [ set wantFasterLane false]
+        [ set wantFasterLane true ]  
+        
+        ifelse preferred-speed < myLaneMin
+        [ set wantSlowerLane false]
+        [ set wantSlowerLane true ]  
+        
+        if debug [ 
+          show "-- Car Evaluating Conditions --"
+          show "laneId (4-fast.3-med,2-slow)"
+          show current-lane-id
+          show "laneBelowFeasible:" 
+          show laneBelowFeasible
+          show "laneAboveFeasible:" 
+          show laneAboveFeasible
+          show "currentSpeed:"
+          show current-speed
+          show "preferredSpeed:"
+          show preferred-speed
+          show "abovePreferredSpeed:" 
+          show abovePreferredSpeed
+          show "belowPreferredSpeed:" 
+          show belowPreferredSpeed
+          show "wantFasterLane:" 
+          show wantFasterLane
+          show "wantSlowerLane:" 
+          show wantSlowerLane
+        ]       
+        
+      end
+        
+      to adjust-speed ; car procedure
+
+      end
+        
  to change-lanes ; car procedure
+   	if debug [ 
+        show "-- Car Changing Lanes --"
+        show "From CurrentLane:" 
+        show current-lane
+      	show "To NextLane:" 
+        show next-lane
+      ]
+   
     		let y 0
   
         if(next-lane = lane-fast) [
@@ -140,37 +233,34 @@ lanes-own [
         set current-lane next-lane
 
         setxy xcor y
-    
+   
+   	if debug [ 
+        show "Lane is now: " 
+        show current-lane
+      ]
   end
-      
-  
-  
+   
+   
+   
+    ;*********************** End Cars *********************************
 
-
-        
-        
-        
-        
-        
+  
 ;*********************** SETUP & GO *********************************
 
 
 to setup
   clear-all
+  set debug true
   setup-display
-  set max-speed-limit 1
-  set min-speed-limit 0
-  setup-lanes
+  setup-lanes ; do before cars, cars drive in lanes, duh
   setup-cars
   update-lanes ; determine congestion based on cars placed
   watch lead-car
-  
   reset-ticks
 end
 
 to go
-  update-lanes ; lanes need to know their parameters
-  
+  update-lanes ; lanes need to know their parameters before the cars can ask them about it!
   
   
   ask lead-car [ set prev-xcor xcor  set prev-ycor ycor ]
@@ -187,11 +277,13 @@ end
 to cars-drive
   ; vroom vroom
   
+   if debug [ 
+     show "---- New Driving Session  ----"
+    ]
   
   ; update all of my parameters
   ask cars [
-    set speed 1
-    fd speed
+    evaluateConditions
   ]  
   
   ; send out all of my arguments
@@ -212,12 +304,27 @@ to cars-drive
   ; let them do what they decided
   
    ask cars [
-    change-lanes
+   ; change-lanes
   ]  
   
 end
   
-;*********************** CAR SETUP *********************************
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  ;*********************** SETUP Car Placement and Initialization of Parameters *********************************
   	
 to setup-cars
   if total-cars > world-width [
@@ -227,13 +334,9 @@ to setup-cars
     stop
   ]
   let line (max-pycor * 2 / 3)
-
-  set lane-one (min-pycor + (line / 2))
-  set lane-two 0
-  set lane-three (max-pycor - (line / 2))
   
   set-default-shape turtles one-of ["car-east"]
-  setup-traffic 90 lane-three lane-two lane-one 
+  setup-traffic 90
 
   set lead-car one-of cars
   ask lead-car [
@@ -246,41 +349,62 @@ to setup-cars
 end
 
     
-to setup-traffic [ direction fast-lane medium-lane slow-lane ]
+to setup-traffic [ direction ]
     create-cars total-cars [
-    set color 15
-    set heading direction
-    set next-lane fast-lane
-    ifelse ((random 2) = 0) [
-      set lane-ycord fast-lane
-    ] [
+      
+      ; give cars random current and preferred speeds
+      set current-speed (random 10 + 1)
+      set preferred-speed (random 10 + 1)
+      
+      ; give random cooperativeness-rating
+      set cooperativeness-rating (random 10 + 1)
+      
+      set color 15
+      set heading direction
+      
+      ; assign them to a random lane (one that they might not like!)
       ifelse ((random 2) = 0) [
-      	set lane-ycord medium-lane
+        set current-lane lane-fast-ypos
+        set current-lane-id lane-fast
       ] [
-        set lane-ycord slow-lane
+        ifelse ((random 2) = 0) [
+          set current-lane lane-medium-ypos
+        	set current-lane-id lane-medium
+
+        ] [
+          set current-lane lane-slow-ypos
+          set current-lane-id lane-slow
+
+        ]
       ]
-    ]
-
-    setxy random-xcor lane-ycord
-
-    set agressive? false
-    if (Lane-Shift) [
-      set previous-x max-pxcor
-      if ((random 2) = 0) [ ; roughly 1 in 1 get to be lane changers
-        set agressive? true
-        set label 0
+      
+      if debug [ 
+        show "---- Car Initialization ----"
+        show "CurrentLane:" 
+        show current-lane
+      	show "NextLane:" 
+        show next-lane
+        show "CurrentSpeed:" 
+        show current-speed  
+        show "PreferredSpeed:" 
+        show preferred-speed  
+        show "CooperativenessRating:" 
+        show cooperativeness-rating  
       ]
-    ]
+      
+      ; randomly place them on a position on the lane
+      
+      setxy random-xcor current-lane
 
-    set speed 0.1 + random-float 0.9
-    separate-cars
-    avoid-collision
+      ; fiddle with how they are placed on their lane
+      separate-cars
+      avoid-collision
   ]
 
 end
 
- ;*********************** CAR SETUP *********************************
 
+  ; ********** basic setup collission avoidance ***************
   
 to separate-cars ;; turtle procedure
   if any? other turtles-here [
@@ -300,60 +424,6 @@ to avoid-collision
     ]
   ]
 end
-to locate-empty-road-spot
-  move-to one-of roads with [ not any? turtles-on self ]
-end
-
-to speed-up  ; car procedure
-  set color 15
-  ifelse speed < (max-speed-limit)
-    [  set speed speed + car-acceleration ]
-    [ set speed max-speed-limit ]
-end
-
-to slow-down  ; car procedure
-  set color 15
-  set speed (speed - car-deceleration)
-  if speed < min-speed-limit [
-    set speed min-speed-limit
-  ]
-end
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
   
 ;*********************** DISPLAY *********************************
 
