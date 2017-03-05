@@ -57,8 +57,10 @@ cars-own [
   
   ;        adjacent vehicles available through - getCarAbove/Below/Ahead
   
-  ; 				alternatives - what are my possible choices?
+  ; 				alternatives - what are my possible choices and desired choices
   myPossibleAlternatives ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
+  
+  ; 		objectives TODO
   
 ]
 
@@ -150,12 +152,11 @@ lanes-own [
       
       to formulateAlternatives ; car procedure
         
-        ; this is where the magic happens
-        determineAlternatives
+        determinePossibleAlternatives
         
       end
       
-        to determineAlternatives ; car procedure 
+        to determinePossibleAlternatives ; car procedure 
           set myPossibleAlternatives [ false false false false false false ] ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
           ; change to table in future?
           
@@ -187,7 +188,9 @@ lanes-own [
             set myPossibleAlternatives replace-item 0 myPossibleAlternatives true ; match upcoming cars speed
           ]
         end
-          
+
+
+            
           
       to evaluateConditions ; car procedure
         evaluateLaneConditions ; gives me info about what lanes i want and what is possible
@@ -309,18 +312,91 @@ lanes-own [
           displayCarStatus
         ] 
         end
-        to executeActions 
-          changeLanes
+          
+        to executeActions ; car procedure
+          ; next-lane-id
+          ; next-speed
+          let chosen false
+          let choice 0          
+            
+					executeChoice choice
+
+          adjustLane ; CALL before changing speed
           adjustSpeed
         end
- 
+            
+        to executeChoice [ choice ]
+          if( choice = 0) [
+           ; matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed
+            matchApproachingCarSpeed
+          ]
+          if( choice = 1) [
+            moveUpLane
+          ]
+          if( choice = 2) [
+            moveDownLane
+          ]
+          if( choice = 3) [
+            speedUp
+          ]
+          if( choice = 4) [
+            slowDown
+          ]
+          if( choice = 5) [
+            staySameSpeed
+          ]          
+        end
+
+          to speedUp ; car procedure
+            set next-speed (current-speed + car-deceleration)
+          end
+          to slowDown ; car procedure
+            set next-speed (current-speed - car-deceleration)
+          end
+          to staySameSpeed ; car procedure
+            set next-speed current-speed
+          end
+          to moveUpLane ; car procedure
+            set next-lane-id (current-lane-id + 1)
+          end
+            
+            to moveDownLane ; car procedure
+            set next-lane-id (current-lane-id - 1)
+          end
+              
+          to matchApproachingCarSpeed  ; car procedure
+            let newSpeed 0
+            let carAhead getCarAhead
+            
+            ask carAhead [
+              set newSpeed current-speed 
+            ]
+            set next-speed newSpeed
+          end
+            
           to adjustSpeed  ; car procedure
+            ; this is where we ACTUALLY adjust the speed, so make sure to have some error checking!
+            ; we already changed lanes by this point if we planned on it, so can base our bounds based on the lanes boudns
+            let currentMax 0
+            let currentMin 0
+            
+            ask lanee current-lane-id [
+              set currentMax max-speed
+              set currentMin min-speed
+            ]
+            if(next-speed > currentMax) [
+              set next-speed currentMax 
+            ]
+            if(next-speed < currentMin) [
+              set next-speed currentMin 
+            ]
+    
             set current-speed next-speed
             fd current-speed
           end
 
         
- to changeLanes ; car procedure
+ to adjustLane ; car procedure
    
    ; changing lanes
    
@@ -401,10 +477,11 @@ to cars-drive
     
     ; forumatate all of my alternatives
     formulateAlternatives
-		
   ]  
   
   ; register all current conflicts
+  
+
   
   ; resolve all conflicts
   
@@ -418,9 +495,6 @@ to cars-drive
   ]  
   
 end
-  
-  
-  
   
   
   
