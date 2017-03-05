@@ -2,9 +2,9 @@ globals [
   loop-counter
   roads
   lane-ycord
-  lane-fast
-  lane-medium
-  lane-slow
+  lane-fast-id
+  lane-medium-id
+  lane-slow-id
   max-speed-limit
   min-speed-limit
   lead-car
@@ -27,14 +27,14 @@ cars-own [
   previous-x
   agressive?
   
+  
     ; basic properties of the car
   
   current-speed ; what is my current speed
   preferred-speed ; what is my preferred speed ( 1 lowest -> 10 highest )
-  current-lane ; what lane POSITION i am in 
   current-lane-id ; what lane ID am i in
   cooperativeness-rating ; how willing am i to let someone in my lane? ( 1 lowest -> 10 highest )
-  next-lane ; what is his next choice?
+  next-lane-id ; what is his next choice?
   next-speed; 
   ;        conditions of the adjacent lanes
   
@@ -50,9 +50,7 @@ cars-own [
   wantFasterLane
   wantSlowerLane
   
-  ;        conditions of the adjacent vehicles
-  carAheadExists
-  carAheadSpeed
+  ;        adjacent vehicles available through - getCarAbove/Below/Ahead
   
   ;TODO
 
@@ -100,9 +98,9 @@ lanes-own [
     to setup-lanes
       let line (max-pycor * 2 / 3)
       
-      set lane-fast-ypos (min-pycor + (line / 2))
+      set lane-slow-ypos (min-pycor + (line / 2))
       set lane-medium-ypos 0
-      set lane-slow-ypos (max-pycor - (line / 2))
+      set lane-fast-ypos (max-pycor - (line / 2))
       
 			create-lanes 3 [
         set current-congestion 0
@@ -110,25 +108,25 @@ lanes-own [
       
       ; update each based on their number
       
-      set lane-fast 4
-      set lane-medium 3
-  		set lane-slow 2
+      set lane-fast-id 4
+      set lane-medium-id 3
+      set lane-slow-id 2
       
-      ask lanee lane-fast [ 
+      ask lanee lane-fast-id [ 
         set max-speed 10
         set min-speed 7
         set emission-rating 3
         set y-pos lane-fast-ypos
       ] ; fast-lane
 
-      ask lanee lane-medium [ 
+      ask lanee lane-medium-id [ 
         set max-speed 6
         set min-speed 4
         set emission-rating 2
         set y-pos lane-medium-ypos
       ] ; medium-lane
       
-      ask lanee lane-slow [ 
+      ask lanee lane-slow-id [ 
         set max-speed 3
         set min-speed 1
         set emission-rating 1
@@ -145,46 +143,88 @@ lanes-own [
       ; methods 
       to evaluateConditions ; car procedure
         evaluateLaneConditions ; gives me info about what lanes i want and what is possible
-        evaluateAdjacentVehicleConditions ; gives me info about what vehicles are next to me
+        
       end
-        to evaluateAdjacentVehicleConditions ; car procedure
-          
-          ; who is in front of me
-          let carAhead 0
-          let carAhead-speed 0
-          
-          ifelse (any? vehicles-directly-ahead) [
-            set carAhead-speed  [ current-speed ] of vehicle-directly-ahead
-            set carAhead true
-          ] [
-            set carAhead-speed  0
-            set carAhead false
-          ]
-          
-          ; who is above me
-          
-          ; who is below me
-          set carAheadSpeed carAhead-speed
-          set carAheadExists carAhead       
-          
-          
-          
-          
-          
-          
-          
-        end
+
+          to-report getCarAhead
+            let carVar 0
+
+            ask cars-on patch-ahead 1 [
+             set carVar self 
+            ]
+            report carVar
+          end
+            
+          to-report getCarAbove ; car procedure
+            let carVar nobody
+            let y 0
+            
+            if(laneAboveFeasible) [
+              ask lanee (current-lane-id + 1) [
+              	set y y-pos 
+            	]
               
+              if( any? cars-on patch xcor y ) [                
+                ask cars-on patch xcor y [
+                  set carVar self 
+                ]
+               	
+              ]
+              
+            ]
+            report carVar            
+          end
+            
+          to-report getCarBelow; car procedure
+            let carVar nobody
+            let y 0
+            
+            if(laneBelowFeasible) [
+              ask lanee (current-lane-id - 1) [
+              	set y y-pos 
+            	]
+              
+              if( any? cars-on patch xcor y ) [                
+                ask cars-on patch xcor y [
+                  set carVar self 
+                ]
+               	
+              ]
+              
+            ]
+            report carVar            
+          end     
+            
+          to displayCarStatus
+            show "laneId (4-fast.3-med,2-slow)"
+            show current-lane-id
+            show "laneBelowFeasible:" 
+            show laneBelowFeasible
+            show "laneAboveFeasible:" 
+            show laneAboveFeasible
+            show "currentSpeed:"
+            show current-speed
+            show "preferredSpeed:"
+            show preferred-speed
+            show "abovePreferredSpeed:" 
+            show abovePreferredSpeed
+            show "belowPreferredSpeed:" 
+            show belowPreferredSpeed
+            show "wantFasterLane:" 
+            show wantFasterLane
+            show "wantSlowerLane:" 
+            show wantSlowerLane
+          end
         to evaluateLaneConditions ; car procedure
                   ; i want to know :
    
         ; are the lanes above or below me feasible?
         
-        ifelse current-lane = lane-slow-ypos 
+        ifelse ycor = lane-slow-ypos 
         [ set laneBelowFeasible false]
         [ set laneBelowFeasible true ]
         
-        ifelse current-lane = lane-fast-ypos 
+        ifelse ycor = lane-fast-ypos 
         [ set laneAboveFeasible false]
         [ set laneAboveFeasible true ]
         
@@ -218,24 +258,7 @@ lanes-own [
         
         if debug [ 
           show "-- Car Evaluating Conditions --"
-          show "laneId (4-fast.3-med,2-slow)"
-          show current-lane-id
-          show "laneBelowFeasible:" 
-          show laneBelowFeasible
-          show "laneAboveFeasible:" 
-          show laneAboveFeasible
-          show "currentSpeed:"
-          show current-speed
-          show "preferredSpeed:"
-          show preferred-speed
-          show "abovePreferredSpeed:" 
-          show abovePreferredSpeed
-          show "belowPreferredSpeed:" 
-          show belowPreferredSpeed
-          show "wantFasterLane:" 
-          show wantFasterLane
-          show "wantSlowerLane:" 
-          show wantSlowerLane
+          displayCarStatus
         ] 
         end
         to executeActions 
@@ -256,48 +279,33 @@ lanes-own [
    	if debug [ 
         show "-- Car Changing Lanes --"
         show "From CurrentLane:" 
-        show current-lane
+      show current-lane-id
       	show "To NextLane:" 
-        show next-lane
+      show next-lane-id
       ]
    
     		let y 0
   
-        if(next-lane = lane-fast) [
-          ask lanee lane-fast [ set y y-pos ] 
+   		if(next-lane-id = lane-fast-id) [
+          set y lane-fast-ypos
         ]
-        if(next-lane = lane-medium) [
-          ask lanee lane-medium [ set y y-pos ] 
+   		if(next-lane-id = lane-medium-id) [
+          set y lane-medium-ypos
         ]
-        if(next-lane = lane-slow) [
-          ask lanee lane-slow [ set y y-pos ] 
+   		if(next-lane-id = lane-slow-id) [
+          set y lane-slow-ypos
         ]
         
-        set current-lane next-lane
+   		set current-lane-id next-lane-id
 
         setxy xcor y
    
    	if debug [ 
         show "Lane is now: " 
-        show current-lane
+        show current-lane-id
       ]
    
   end
-   
-   
-   
-   ; get vehicles ahead of me
-   
-        to-report vehicles-directly-ahead
-          ifelse (agressive?) [
-            report cars-on patch-ahead 1
-          ] [
-            report (turtle-set (cars-on patch-ahead 1) (cars-on patch-ahead cardistance))
-          ]
-        end
-        to-report vehicle-directly-ahead
-          report one-of vehicles-directly-ahead
-        end
    
     ;*********************** End Cars *********************************
 
@@ -342,8 +350,6 @@ to cars-drive
   ask cars [
     ; update all of my parameters
     evaluateConditions
-    
-    
     
     ; send out all of my arguments
     
@@ -398,7 +404,6 @@ to setup-cars
     set color sky
     if (Lane-Shift) [
       set agressive? true
-      set label 0
     ]
   ]
 end
@@ -416,41 +421,32 @@ to setup-traffic [ direction ]
       
       set color 15
       set heading direction
-      
+      set label who
       ; assign them to a random lane (one that they might not like!)
+      let chosenLaneYPos 0
       ifelse ((random 2) = 0) [
-        set current-lane lane-fast-ypos
-        set current-lane-id lane-fast
+        set chosenLaneYPos lane-fast-ypos
+        set current-lane-id lane-fast-id
       ] [
         ifelse ((random 2) = 0) [
-          set current-lane lane-medium-ypos
-        	set current-lane-id lane-medium
+           set chosenLaneYPos lane-medium-ypos
+          set current-lane-id lane-medium-id
 
         ] [
-          set current-lane lane-slow-ypos
-          set current-lane-id lane-slow
+          set chosenLaneYPos lane-slow-ypos
+          set current-lane-id lane-slow-id
         ]
       ]
       
-      set next-lane current-lane ; make him stay where he is for now
+      set next-lane-id current-lane-id ; make him stay where he is for now
       
       if debug [ 
         show "---- Car Initialization ----"
-        show "CurrentLane:" 
-        show current-lane
-      	show "NextLane:" 
-        show next-lane
-        show "CurrentSpeed:" 
-        show current-speed  
-        show "PreferredSpeed:" 
-        show preferred-speed  
-        show "CooperativenessRating:" 
-        show cooperativeness-rating  
       ]
       
       ; randomly place them on a position on the lane
       
-      setxy random-xcor current-lane
+      setxy random-xcor chosenLaneYPos
 
       ; fiddle with how they are placed on their lane
       separate-cars
@@ -474,7 +470,7 @@ to avoid-collision
   let max-iterations 25
   if any? other cars-here [
     forward random 2
-    if (loop-counter < 25) [
+    if (loop-counter < 50) [
       avoid-collision
       separate-cars
     ]
