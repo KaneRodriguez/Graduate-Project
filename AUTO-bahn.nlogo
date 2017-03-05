@@ -55,13 +55,18 @@ cars-own [
   wantFasterLane
   wantSlowerLane
   
-  ;        adjacent vehicles available through - getCarAbove/Below/Ahead
+  ;        adjacent vehicles available through - getCarAbove/Below/Ahead getCarAheadTooSlow
   
   ; 				alternatives - what are my possible choices and desired choices
   myPossibleAlternatives ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
+  rankedAlternatives ; rankings per each alternative
   
   ; 		objectives TODO
   
+  
+  
+  ; dummy cars
+  dummy
 ]
 
 lanes-own [
@@ -153,9 +158,64 @@ lanes-own [
       to formulateAlternatives ; car procedure
         
         determinePossibleAlternatives
+        rankPossibleAlternatives ; call after we already determined whats possible
+        
+        
         
       end
-      
+        to-report max-item2 [ #list ] 
+           report position (max #list) #list 
+        end 
+        to rankPossibleAlternatives ; car procedure
+          ; this is where we use our own internal priority to 
+          set rankedAlternatives [ 0 0 0 0 0 0 ]
+          
+          ; TESTING           [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
+
+          
+          ; see if car ahead is a trolling little turtle, going to slow for his lane
+          let carAheadTooSlow getCarAheadTooSlow
+          
+          ; car ahead isnt playing the argumentation game, give up on arguing with him
+          
+          ifelse wantSlowerLane [  set rankedAlternatives replace-item 2 rankedAlternatives (item 2 rankedAlternatives + 2) ] 
+          [ ifelse wantFasterLane [  set rankedAlternatives replace-item 1 rankedAlternatives (item 1 rankedAlternatives + 2) ] 
+          [ ifelse belowPreferredSpeed [ set rankedAlternatives replace-item 3 rankedAlternatives (item 3 rankedAlternatives + 2) ] 
+          [ ifelse abovePreferredSpeed [ set rankedAlternatives replace-item 4 rankedAlternatives (item 4 rankedAlternatives + 2) ]      
+          [ ;; default case for staying the same speed
+            set rankedAlternatives replace-item 5 rankedAlternatives (item 5 rankedAlternatives + 2)
+          ]]]]
+          
+          ifelse getCarAhead != nobody [ set rankedAlternatives replace-item 0 rankedAlternatives (item 0 rankedAlternatives + 2) ] [ ]
+          let altIndex 0
+          
+          foreach myPossibleAlternatives [
+            if( item altIndex myPossibleAlternatives = false ) [ set rankedAlternatives replace-item altIndex rankedAlternatives 0 ]
+            set altIndex (altIndex + 1)
+          ]
+          
+        end
+          to-report getCarAheadTooSlow
+            let carAhead getCarAhead
+            let currentLaneMin 0
+            let carAheadTooSlow false
+
+            ask lanee current-lane-id [
+              set currentLaneMin max-speed 
+            ]
+
+            if( carAhead != nobody ) [
+             ; is this car going too slow for his lane??
+              let speedOfCarAhead 0
+              ask carAhead [
+                set speedOfCarAhead current-speed 
+              ]
+              if( speedOfCarAhead < currentLaneMin ) [
+                set carAheadTooSlow true 
+              ]
+            ]
+            report carAheadTooSlow
+          end
         to determinePossibleAlternatives ; car procedure 
           set myPossibleAlternatives [ false false false false false false ] ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
           ; change to table in future?
@@ -316,10 +376,9 @@ lanes-own [
         to executeActions ; car procedure
           ; next-lane-id
           ; next-speed
-          let chosen false
-          let choice 0          
+          let chosen false 
             
-					executeChoice choice
+					executeChoice max-item2 rankedAlternatives
 
           adjustLane ; CALL before changing speed
           adjustSpeed
@@ -469,7 +528,7 @@ to cars-drive
    if debug [ 
      show "---- New Driving Session  ----"
     ]
-  
+  show any? cars with [ dummy = false]
   
   ask cars [
     ; update all of my parameters
