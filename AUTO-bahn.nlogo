@@ -19,6 +19,8 @@ globals [
   conflicts
 ]
 
+extensions [table]
+
 breed [ dividers divider ]
 breed [ cars car ]
 breed [ lanes lanee ] 
@@ -55,7 +57,7 @@ cars-own [
   
   ;        adjacent vehicles available through - getCarAbove/Below/Ahead
   
-  ; alternatives - what are my possible choices?
+  ; 				alternatives - what are my possible choices?
   myPossibleAlternatives ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
   
 ]
@@ -149,16 +151,41 @@ lanes-own [
       to formulateAlternatives ; car procedure
         
         ; this is where the magic happens
-        
+        determineAlternatives
         
       end
       
         to determineAlternatives ; car procedure 
-          set myPossibleAlternatives [ ] ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
+          set myPossibleAlternatives [ false false false false false false ] ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
+          ; change to table in future?
           
+          ; can we move up a lane?
           
+          let carAbove getCarAbove
           
+          if(laneAboveFeasible and (carAbove = nobody) ) [
+           set myPossibleAlternatives replace-item 1 myPossibleAlternatives true ; move up
+          ]
           
+          ; can we move up a lane?
+          
+          let carBelow getCarBelow
+          
+          if(laneBelowFeasible and (carBelow = nobody) ) [
+            set myPossibleAlternatives replace-item 2 myPossibleAlternatives true ; move down
+          ]
+
+          ; can we speed up?
+          
+          let carAhead getCarAhead
+          
+          ifelse( (carAhead = nobody) ) [
+            set myPossibleAlternatives replace-item 3 myPossibleAlternatives true ; speed up
+            set myPossibleAlternatives replace-item 4 myPossibleAlternatives true ; slow down
+            set myPossibleAlternatives replace-item 5 myPossibleAlternatives true ; stay same speed
+          ] [
+            set myPossibleAlternatives replace-item 0 myPossibleAlternatives true ; match upcoming cars speed
+          ]
         end
           
           
@@ -167,7 +194,7 @@ lanes-own [
       end
 
           to-report getCarAhead
-            let carVar 0
+            let carVar nobody
 
             ask cars-on patch-ahead 1 [
              set carVar self 
