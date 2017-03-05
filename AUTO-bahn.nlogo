@@ -16,11 +16,13 @@ globals [
   lane-medium-ypos
 	lane-slow-ypos
   debug
+  conflicts
 ]
 
 breed [ dividers divider ]
 breed [ cars car ]
 breed [ lanes lanee ] 
+
 
 cars-own [
   speed
@@ -36,6 +38,7 @@ cars-own [
   cooperativeness-rating ; how willing am i to let someone in my lane? ( 1 lowest -> 10 highest )
   next-lane-id ; what is his next choice?
   next-speed; 
+  
   ;        conditions of the adjacent lanes
   
   ; are the lanes above and below even feasible?
@@ -52,8 +55,9 @@ cars-own [
   
   ;        adjacent vehicles available through - getCarAbove/Below/Ahead
   
-  ;TODO
-
+  ; alternatives - what are my possible choices?
+  myPossibleAlternatives ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
+  
 ]
 
 lanes-own [
@@ -140,10 +144,26 @@ lanes-own [
 
 ;*********************** Cars *********************************
      
-      ; methods 
+      ; methods  
+      
+      to formulateAlternatives ; car procedure
+        
+        ; this is where the magic happens
+        
+        
+      end
+      
+        to determineAlternatives ; car procedure 
+          set myPossibleAlternatives [ ] ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
+          
+          
+          
+          
+        end
+          
+          
       to evaluateConditions ; car procedure
         evaluateLaneConditions ; gives me info about what lanes i want and what is possible
-        
       end
 
           to-report getCarAhead
@@ -215,6 +235,7 @@ lanes-own [
             show "wantSlowerLane:" 
             show wantSlowerLane
           end
+            
         to evaluateLaneConditions ; car procedure
                   ; i want to know :
    
@@ -351,13 +372,14 @@ to cars-drive
     ; update all of my parameters
     evaluateConditions
     
-    ; send out all of my arguments
-    
-
+    ; forumatate all of my alternatives
+    formulateAlternatives
+		
   ]  
   
+  ; register all current conflicts
   
-  
+  ; resolve all conflicts
   
   ; everyone should know what theyre doing by now
   
