@@ -182,7 +182,9 @@ lanes-own [
           set recommendedAction "matchApproachingCarSpeed"
         ] 
         
-
+        if ( getCarAheadTooSlow AND getLaneAboveAvailability AND belowPreferredSpeed) [
+          set recommendedAction "moveUpLane" 
+        ]
         
         
       end
@@ -217,6 +219,7 @@ lanes-own [
               ask carAhead [
                 set speedOfCarAhead current-speed 
               ]
+              show speedOfCarAhead
               if( speedOfCarAhead < currentLaneMin ) [
                 set carAheadTooSlow true 
               ]
@@ -234,9 +237,19 @@ lanes-own [
 
           to-report getCarAhead
             let carVar nobody
-
+            
             ask cars-on patch-ahead 1 [
              set carVar self 
+            ]
+            if carVar = nobody [
+              ask cars-on patch-ahead 2 [
+             		set carVar self 
+            	]
+              if carVar = nobody [
+              	ask cars-on patch-ahead 3 [
+                  set carVar self 
+                ]
+              ]
             ]
             report carVar
           end
@@ -508,7 +521,6 @@ to cars-drive
    if debug [ 
      show "---- New Driving Session  ----"
     ]
-  show any? cars with [ dummy = false]
   
   ask cars [
     evaluateConditions
