@@ -56,10 +56,7 @@ cars-own [
   wantSlowerLane
   
   ;        adjacent vehicles available through - getCarAbove/Below/Ahead getCarAheadTooSlow
-  
-  ; 				alternatives - what are my possible choices and desired choices
-  myPossibleAlternatives ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
-  rankedAlternatives ; rankings per each alternative
+ 	recommendedAction
   
   ; 		objectives TODO
   
@@ -155,46 +152,56 @@ lanes-own [
      
       ; methods  
       
-      to formulateAlternatives ; car procedure
+      to getRecommendedAction ; car procedure
+                   ; matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed
+        set recommendedAction "staySameSpeed"
         
-        determinePossibleAlternatives
-        rankPossibleAlternatives ; call after we already determined whats possible
+        ;; < since NOT wantSlowerLane AND NOT wantFasterLane AND NOT abovePreferredSpeed AND NOT belowPreferredSpeed AND (getCarAhead = nobody); we are in the speed we want, stay >
         
+        if ( NOT wantSlowerLane AND NOT wantFasterLane AND NOT abovePreferredSpeed AND NOT belowPreferredSpeed AND (getCarAhead = nobody) ) [
+          set recommendedAction "staySameSpeed"
+        ] 
+                
+        if ( NOT wantSlowerLane AND NOT wantFasterLane AND belowPreferredSpeed AND (getCarAhead = nobody) ) [
+          set recommendedAction "speedUp"
+        ]         
+        
+        if ( NOT wantSlowerLane AND NOT wantFasterLane AND abovePreferredSpeed and (getCarAhead = nobody ) ) [
+          set recommendedAction "slowDown"
+        ]        
+        
+        if ( wantFasterLane AND getLaneAboveAvailability ) [
+          set recommendedAction "moveUpLane"
+        ]        
+        
+        if ( wantSlowerLane AND getLaneBelowAvailability ) [
+          set recommendedAction "moveDownLane"
+        ]
+
+        if ( getCarAhead AND NOT getLaneAboveAvailability AND NOT getLaneBelowAvailability ) [
+          set recommendedAction "matchApproachingCarSpeed"
+        ] 
+        
+
         
         
       end
-        to-report max-item2 [ #list ] 
-           report position (max #list) #list 
-        end 
-        to rankPossibleAlternatives ; car procedure
-          ; this is where we use our own internal priority to 
-          set rankedAlternatives [ 0 0 0 0 0 0 ]
-          
-          ; TESTING           [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
-
-          
-          ; see if car ahead is a trolling little turtle, going to slow for his lane
-          let carAheadTooSlow getCarAheadTooSlow
-          
-          ; car ahead isnt playing the argumentation game, give up on arguing with him
-          
-          ifelse wantSlowerLane [  set rankedAlternatives replace-item 2 rankedAlternatives (item 2 rankedAlternatives + 2) ] 
-          [ ifelse wantFasterLane [  set rankedAlternatives replace-item 1 rankedAlternatives (item 1 rankedAlternatives + 2) ] 
-          [ ifelse belowPreferredSpeed [ set rankedAlternatives replace-item 3 rankedAlternatives (item 3 rankedAlternatives + 2) ] 
-          [ ifelse abovePreferredSpeed [ set rankedAlternatives replace-item 4 rankedAlternatives (item 4 rankedAlternatives + 2) ]      
-          [ ;; default case for staying the same speed
-            set rankedAlternatives replace-item 5 rankedAlternatives (item 5 rankedAlternatives + 2)
-          ]]]]
-          
-          ifelse getCarAhead != nobody [ set rankedAlternatives replace-item 0 rankedAlternatives (item 0 rankedAlternatives + 2) ] [ ]
-          let altIndex 0
-          
-          foreach myPossibleAlternatives [
-            if( item altIndex myPossibleAlternatives = false ) [ set rankedAlternatives replace-item altIndex rankedAlternatives 0 ]
-            set altIndex (altIndex + 1)
-          ]
-          
+			to-report getLaneAboveAvailability
+        
+        if( laneAboveFeasible and (getCarAbove = nobody) ) [
+          report true
+        ]
+        report false
+        end			
+        
+        to-report getLaneBelowAvailability
+        
+        if( laneBelowFeasible and (getCarBelow = nobody) ) [
+          report true
+        ]
+        report false
         end
+          
           to-report getCarAheadTooSlow
             let carAhead getCarAhead
             let currentLaneMin 0
@@ -216,38 +223,7 @@ lanes-own [
             ]
             report carAheadTooSlow
           end
-        to determinePossibleAlternatives ; car procedure 
-          set myPossibleAlternatives [ false false false false false false ] ; [ matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed ]
-          ; change to table in future?
-          
-          ; can we move up a lane?
-          
-          let carAbove getCarAbove
-          
-          if(laneAboveFeasible and (carAbove = nobody) ) [
-           set myPossibleAlternatives replace-item 1 myPossibleAlternatives true ; move up
-          ]
-          
-          ; can we move up a lane?
-          
-          let carBelow getCarBelow
-          
-          if(laneBelowFeasible and (carBelow = nobody) ) [
-            set myPossibleAlternatives replace-item 2 myPossibleAlternatives true ; move down
-          ]
 
-          ; can we speed up?
-          
-          let carAhead getCarAhead
-          
-          ifelse( (carAhead = nobody) ) [
-            set myPossibleAlternatives replace-item 3 myPossibleAlternatives true ; speed up
-            set myPossibleAlternatives replace-item 4 myPossibleAlternatives true ; slow down
-            set myPossibleAlternatives replace-item 5 myPossibleAlternatives true ; stay same speed
-          ] [
-            set myPossibleAlternatives replace-item 0 myPossibleAlternatives true ; match upcoming cars speed
-          ]
-        end
 
 
             
@@ -324,6 +300,8 @@ lanes-own [
             show wantFasterLane
             show "wantSlowerLane:" 
             show wantSlowerLane
+            show "recommendedAction:"
+            show recommendedAction
           end
             
         to evaluateLaneConditions ; car procedure
@@ -374,40 +352,42 @@ lanes-own [
         end
           
         to executeActions ; car procedure
-          ; next-lane-id
-          ; next-speed
-          let chosen false 
-            
-					executeChoice max-item2 rankedAlternatives
+        
+          if debug [
+           show "-- Car Executing Choice --"
+            displayCarStatus
+          ]
+          
+          executeChoice recommendedAction
 
           adjustLane ; CALL before changing speed
           adjustSpeed
         end
             
         to executeChoice [ choice ]
-          if( choice = 0) [
+          if( choice = "matchApproachingCarSpeed") [
            ; matchSpeedOfApproachingCar moveUpLane moveDownLane speedUp slowDown staySameSpeed
             matchApproachingCarSpeed
           ]
-          if( choice = 1) [
+          if( choice = "moveUpLane") [
             moveUpLane
           ]
-          if( choice = 2) [
+          if( choice = "moveDownLane") [
             moveDownLane
           ]
-          if( choice = 3) [
+          if( choice = "speedUp") [
             speedUp
           ]
-          if( choice = 4) [
+          if( choice = "slowDown") [
             slowDown
           ]
-          if( choice = 5) [
+          if( choice = "staySameSpeed") [
             staySameSpeed
           ]          
         end
 
           to speedUp ; car procedure
-            set next-speed (current-speed + car-deceleration)
+            set next-speed (current-speed + car-acceleration)
           end
           to slowDown ; car procedure
             set next-speed (current-speed - car-deceleration)
@@ -531,11 +511,9 @@ to cars-drive
   show any? cars with [ dummy = false]
   
   ask cars [
-    ; update all of my parameters
     evaluateConditions
     
-    ; forumatate all of my alternatives
-    formulateAlternatives
+    getRecommendedAction
   ]  
   
   ; register all current conflicts
