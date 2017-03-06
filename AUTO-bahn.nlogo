@@ -235,22 +235,14 @@ lanes-own [
         evaluateLaneConditions ; gives me info about what lanes i want and what is possible
       end
 
-          to-report getCarAhead
+          to-report getCarAhead ; car procedure
             let carVar nobody
             
             ask cars-on patch-ahead 1 [
-             set carVar self 
+              set carVar self
             ]
-            if carVar = nobody [
-              ask cars-on patch-ahead 2 [
-             		set carVar self 
-            	]
-              if carVar = nobody [
-              	ask cars-on patch-ahead 3 [
-                  set carVar self 
-                ]
-              ]
-            ]
+            show carVar
+            show self 
             report carVar
           end
             
@@ -293,7 +285,7 @@ lanes-own [
             ]
             report carVar            
           end     
-            
+
           to displayCarStatus
             show "laneId (4-fast.3-med,2-slow)"
             show current-lane-id
