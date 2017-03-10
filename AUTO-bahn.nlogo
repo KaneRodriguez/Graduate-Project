@@ -17,6 +17,8 @@ globals [
 	lane-slow-ypos
   debug
   conflicts
+  
+  worldEmissionLevel
 ]
 
 extensions [table]
@@ -438,7 +440,7 @@ end
 
 to go
   update-lanes ; lanes need to know their parameters before the cars can ask them about it!
-
+  updateWorldEmission
 
   ask lead-car [ set prev-xcor xcor  set prev-ycor ycor ]
   cars-drive
@@ -448,7 +450,23 @@ to go
 
 end
 
+to updateWorldEmission
+  let totalEmission 0
+  
+        ask lanee lane-fast-id [
+          set totalEmission (totalEmission + emission-rating * current-congestion)
+      ] ; fast-lane
 
+      ask lanee lane-medium-id [
+        set totalEmission (totalEmission + emission-rating * current-congestion)
+      ] ; medium-lane
+
+      ask lanee lane-slow-id [
+        set totalEmission (totalEmission + emission-rating * current-congestion)
+      ] ; slow-lane
+      
+   set worldEmissionLevel totalEmission
+end
 
 
 to cars-drive
@@ -457,7 +475,7 @@ to cars-drive
    if debug [
      show "---- New Driving Session  ----"
     ]
-   
+
   ask cars [
     if not dummy [
       determineFeasibleActions
@@ -478,7 +496,7 @@ to cars-drive
     ifelse not dummy [
       performAction
     ] [
-     fd current-speed 
+     fd current-speed
     ]
   ]
 
@@ -805,7 +823,7 @@ end
     if( currentPriority = "travelTime" ) [
       set decidedAction decideBestTravelTimeAction
     ]
-
+    
     if( currentPriority = "emission" ) [
       set decidedAction decideBestEmissionAction
     ]
@@ -832,33 +850,31 @@ end
       set currentLaneMax max-speed
     ]
 
-    if belowPreferredSpeed [
-      ifelse canMoveUp [
-        if wantFasterLane OR ( currentLaneMax < ( current-speed + speedFactor) ) [
-          report "moveUp"
-        ]
-      ] [
-        ;; cant move up, lets accelerate
-        if canAccelerate [
-          report "accelerate"
-        ]
+    ; fast people ignore their preferred-speed
+    if( currentLaneMax < (preferred-speed + speedFactor ) )[
+      ;; this lane is too slow for us
+      if canMoveUp [
+        report "moveUp"
+      ] 
+      if canAccelerate [
+        report "accelerate" 
       ]
-    ]
 
-  if abovePreferredSpeed [
-    ifelse canMoveDown [
-      if ( currentLaneMin < ( current-speed + speedFactor) ) [
+    ]
+      
+  ;; is this lane too fast for me?    
+    if( currentLaneMin > (preferred-speed + speedFactor ) )[
+      ;; this lane is too slow for us
+      if canMoveDown [
         report "moveDown"
+      ] 
+      if canDecelerate [
+        report "decelerate" 
       ]
-    ] [
-        ;; cant move down, lets decelerate
-        if canDecelerate [
-          report "decelerate"
-        ]
-      ]
+
     ]
 
-  if atPreferredSpeed and canMaintainSpeed [
+  if ( current-speed = (preferred-speed + speedFactor) ) and canMaintainSpeed [
     report "maintainSpeed"
   ]
 
@@ -869,37 +885,39 @@ end
   to-report decideBestEmissionAction
     let currentLaneMin 0
     let currentLaneMax 0
-    let emissionFactor ( emissionFriendliness / 10)
+    let speedFactor emissionFriendliness
 
     ask lanee current-lane-id [
       set currentLaneMin min-speed
       set currentLaneMax max-speed
     ]
 
-    if ( currentLaneMin > ( preferred-speed - currentLaneRelativeEmission) )  [
+    ; we are willing to go below our preferred speed in order to go to a less emission lane
+; if the lane i am in has a max that is below my adjusted preferred speed, go up
+    if( currentLaneMax < (preferred-speed - speedFactor ) )[
+      ;; this lane is too slow for us
+      if canMoveUp [
+        report "moveUp"
+      ] 
+      if canAccelerate [
+        report "accelerate" 
+      ]
+
+    ]
+      
+  ;; is this lane too fast for me?    
+    if( currentLaneMin > (preferred-speed - speedFactor ) )[
+      ;; this lane is too slow for us
       if canMoveDown [
         report "moveDown"
       ] 
-    ]
-    
-    if ( currentLaneMax < ( preferred-speed - currentLaneRelativeEmission) ) [
-      if canMoveUp [
-          report "moveUp"
-      ] 
-    ]
-    
-    if belowPreferredSpeed [
       if canDecelerate [
-        report "decelerate"
-      ] 
-    ]
-    if abovePreferredSpeed [
-      if canAccelerate [
-        report "accelerate"
-      ] 
+        report "decelerate" 
+      ]
+
     ]
 
-  if atPreferredSpeed and canMaintainSpeed [
+  if ( current-speed = (preferred-speed - speedFactor) ) and canMaintainSpeed [
     report "maintainSpeed"
   ]
 
@@ -909,39 +927,52 @@ end
   to-report decideBestCongestionAction
     let currentLaneMin 0
     let currentLaneMax 0
+    let speedFactor congestionAwareness
+    
 
     ask lanee current-lane-id [
       set currentLaneMin min-speed
       set currentLaneMax max-speed
     ]
-    if canMoveUp [
-      if ( ( ( currentLaneRelativeCongestion - laneAboveRelativeCongestion) + preferred-speed ) > currentLaneMax) [
-         report "moveUp"
-      ]
-    ]
-    if canMoveDown [
-      if ( ( ( currentLaneRelativeCongestion - laneAboveRelativeCongestion) + preferred-speed ) < currentLaneMin) [
-         report "moveDown"
-      ]
-    ]
-    
-    if belowPreferredSpeed [
-      if canDecelerate [
-        report "decelerate"
+
+; if the lane i am in has a max that is below my adjusted preferred speed, go up
+ 
+    if( currentLaneMax < ( preferred-speed ) ) [ 
+      ;; this lane is too slow for us
+      ;; but should we move up if its congested? we want a relative congestion of .333 (each lane the same)
+      
+      ;; dont want to move to a more congested lane, or a lane that is relatively congested (half)
+      if canMoveUp and ( laneAboveRelativeCongestion < congestionAwareness OR laneAboveRelativeCongestion < currentLaneRelativeCongestion )  [
+        report "moveUp"
       ] 
     ]
-    if abovePreferredSpeed [
-      if canAccelerate [
-        report "accelerate"
+      
+  ;; is this lane too fast for me?    
+    if( currentLaneMin > (preferred-speed ) )[
+      ;; this lane is too slow for us
+      if canMoveDown  and ( laneBelowRelativeCongestion < congestionAwareness OR laneBelowRelativeCongestion < currentLaneRelativeCongestion )[
+        report "moveDown"
       ] 
+
+
     ]
 
-  if atPreferredSpeed and canMaintainSpeed [
+  if belowPreferredSpeed [
+   if canAccelerate [
+        report "accelerate" 
+      ] 
+  ]
+  if belowPreferredSpeed [
+   if canDecelerate [
+        report "decelerate" 
+      ]
+  ]
+      
+  if canMaintainSpeed [
     report "maintainSpeed"
   ]
 
    report ""
-
 end
 
   to resolveArguments
@@ -1189,7 +1220,7 @@ end
                 set next-speed (.9 * carAheadSpeed )
               ]
             ]
-            
+
             set current-speed next-speed
             fd current-speed
           end
@@ -1261,7 +1292,7 @@ to setup-traffic [ direction ]
   let emissionAmount emissionCars
   let congestionAmount congestionCars
   let speedAmount speedCars
-  
+
     create-cars congestionAmount [
 
       initializeCarParameters ; doesnt include all for now
@@ -1331,7 +1362,7 @@ create-cars emissionAmount [
       set current-speed ( (random 10 + 1) / 10)
       set preferred-speed ( (random 10 + 1) / 10 )
 
-      set currentPriority "emmission"
+      set currentPriority "emission"
 
       ifelse( dummyCount < dummy-cars ) [
        set dummy true
