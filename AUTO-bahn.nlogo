@@ -480,6 +480,7 @@ to cars-drive
     if not dummy [
       determineFeasibleActions
       decideBestAction
+      
     ]
   ]
 
@@ -836,7 +837,16 @@ end
      ; OR just stop!
       set decidedAction "decelerate"
     ]
+    
     set chosenAction decidedAction
+    let argumentation false
+    if argumentation [
+      ifelse chosenAction = "moveUp" OR chosenAction = "moveDown" [
+        set laneChange true 
+      ] [
+        set laneChange false 
+      ]
+    ]
 end
 
   to-report decideBestTravelTimeAction
@@ -976,7 +986,11 @@ end
 end
 
   to resolveArguments
-
+    if (laneChange) [
+      determineFeasibleActions
+      decideBestAction
+    ]
+    
 end
 
   to waitForTurnEnd
@@ -1086,7 +1100,53 @@ end
             ]
             report carVar
           end
+          
+          to-report getCarFarAbove ; car procedure
+            let carVar nobody
+            let y 0
 
+            if(current-lane-id = lane-slow-id) [
+
+              ask lanee (current-lane-id + 2) [
+              	set y y-pos
+            	]
+
+              if( any? cars-on patch xcor y ) [
+                ask cars-on patch xcor y [
+                  set carVar self
+                ]
+
+              ]
+
+            ]
+            report carVar
+          end
+          to-report getCarCuttingOff 
+            let carVar nobody
+            let y 0
+
+            if(current-lane-id = lane-slow-id) [
+              ask lanee (current-lane-id + 1) [
+              	set y y-pos
+            	]
+              if( any? cars-on patch (xcor - 1) y ) [
+                ask cars-on patch xcor y [
+                  set carVar self
+                ]
+              ]
+            ]
+            if(current-lane-id = lane-fast-id) [
+              ask lanee (current-lane-id - 1 ) [
+              	set y y-pos
+            	]
+              if( any? cars-on patch (xcor - 1) y ) [
+                ask cars-on patch xcor y [
+                  set carVar self
+                ]
+              ]
+            ]
+            report carVar
+          end
           to-report getCarBelow; car procedure
             let carVar nobody
             let y 0
@@ -1106,7 +1166,27 @@ end
             ]
             report carVar
           end
+          
+          to-report getCarFarBelow; car procedure
+            let carVar nobody
+            let y 0
 
+            if(current-lane-id = lane-fast-id) [
+              ask lanee (current-lane-id - 2) [
+              	set y y-pos
+            	]
+
+              if( any? cars-on patch xcor y ) [
+                ask cars-on patch xcor y [
+                  set carVar self
+                ]
+
+              ]
+
+            ]
+            report carVar
+          end
+          
   to initializeCarParameters
     ; * Note: does not initialize all yet
 
