@@ -869,20 +869,20 @@ end
   to-report decideBestEmissionAction
     let currentLaneMin 0
     let currentLaneMax 0
-    let emissionFactor ( emissionFriendliness )
+    let emissionFactor ( emissionFriendliness / 10)
 
     ask lanee current-lane-id [
       set currentLaneMin min-speed
       set currentLaneMax max-speed
     ]
-    
-    if ( currentLaneMin > ( preferred-speed - emissionFactor) )  [
+
+    if ( currentLaneMin > ( preferred-speed - currentLaneRelativeEmission) )  [
       if canMoveDown [
         report "moveDown"
       ] 
     ]
     
-    if ( currentLaneMax < ( preferred-speed - emissionFactor) ) [
+    if ( currentLaneMax < ( preferred-speed - currentLaneRelativeEmission) ) [
       if canMoveUp [
           report "moveUp"
       ] 
