@@ -23,7 +23,7 @@ globals [
   worldEmissionLevel
 ]
 
-extensions [table]
+extensions [array table]
 
 breed [ dividers divider ]
 breed [ cars car ]
@@ -130,7 +130,6 @@ cars-own [
   stance
 
 ]
-
 lanes-own [
 
   ; attributes
@@ -140,11 +139,9 @@ lanes-own [
   emission-rating ; cars traveling in this lane emit this for their emissions
   y-pos ; where are we on the y axis
 ]
-
 ;*********************** Lanes *********************************
 
 ; methods
-
 to update-lane ; lane procedure
                ; update all of lane parameters here
   let congestion 0
@@ -157,19 +154,13 @@ to update-lane ; lane procedure
   set current-congestion congestion
 
 end
-
-
 ; ******* group of lanes ********
-
 
 to update-lanes
   ask lanes [
     update-lane
   ]
 end
-
-
-
 to setup-lanes
   let line (max-pycor * 2 / 3)
 
@@ -209,14 +200,11 @@ to setup-lanes
   ] ; slow-lane
 
 end
-
-
 ;*********************** End Lanes *********************************
 
 ;*********************** Cars *********************************
 
 ; methods
-
 to displayCarStatus
   show "laneId (4-fast.3-med,2-slow)"
   show current-lane-id
@@ -241,17 +229,12 @@ to displayCarStatus
   show "recommendedAction:"
   show recommendedAction
 end
-
-
-
 ;*********************** End Cars *********************************
 
 
 
 
 ;*********************** SETUP & GO *********************************
-
-
 to setup
   clear-all
   set debug false
@@ -262,7 +245,6 @@ to setup
   watch lead-car
   reset-ticks
 end
-
 to go
   update-lanes ; lanes need to know their parameters before the cars can ask them about it!
   updateWorldEmission
@@ -274,7 +256,6 @@ to go
   ;  plot-data
 
 end
-
 to updateWorldEmission
   let totalEmission 0
 
@@ -292,8 +273,6 @@ to updateWorldEmission
 
   set worldEmissionLevel totalEmission
 end
-
-
 to cars-drive
   ; vroom vroom
 
@@ -314,9 +293,10 @@ to cars-drive
   ]
   ask cars [
     if not dummy [
-      if(laneChange) [
+      if(not laneChange) [
         resolveArguments
       ]
+      
       waitForTurnEnd
     ]
   ]
@@ -332,10 +312,9 @@ to cars-drive
   ]
 
 end
-
 ;; ********************* Expert System **************************
-to determineFeasibleActions
 
+to determineFeasibleActions ; car procedure
   ifelse ycor = lane-slow-ypos
   [ set laneBelowInBounds false]
   [ set laneBelowInBounds true ]
@@ -445,9 +424,7 @@ to determineFeasibleActions
 
 
 end
-
 ; *********** Possible Actions ************8
-
 to-report canMoveUp
   ; 3 conditions - Bounds, Occupation, Claim
   if(laneAboveInBounds AND not laneAboveOccupied AND not laneAboveClaimed) [
@@ -455,7 +432,6 @@ to-report canMoveUp
   ]
   report false
 end
-
 to-report canMoveDown
   ; 3 conditions - Bounds, Occupation, Claim
   if(laneBelowInBounds AND not laneBelowOccupied AND not laneBelowClaimed) [
@@ -463,7 +439,6 @@ to-report canMoveDown
   ]
   report false
 end
-
 to-report canMaintainSpeed
   ; as long as spot ahead isnt occupied or claimed
   if(not spotAheadOccupied AND not spotAheadClaimed) [
@@ -471,7 +446,6 @@ to-report canMaintainSpeed
   ]
   report false
 end
-
 to-report canDecelerate
   ; current speed not below lane min : NOTE - Could change! Could have no requirements to stop!
   let currentMax 0
@@ -488,7 +462,6 @@ to-report canDecelerate
   report false
 
 end
-
 to-report canAccelerate
   ; current speed not above lane max : NOTE - Could change! Could have no requirements to stop!
   let currentMax 0
@@ -505,12 +478,10 @@ to-report canAccelerate
   report false
 
 end
-
 ; *********** End Possible Actions ************8
 
 
 ; *********** Perform Actions ************8
-
 to speedUp ; car procedure
   set next-speed (current-speed + car-acceleration)
   adhereToLaneRules "max"
@@ -526,12 +497,10 @@ to moveUpLane ; car procedure
   set next-lane-id (current-lane-id + 1)
   adhereToLaneRules "min"
 end
-
 to moveDownLane ; car procedure
   set next-lane-id (current-lane-id - 1)
   adhereToLaneRules "max"
 end
-
 to adhereToLaneRules [ ruleType ]
   let currentMax 0
   let currentMin 0
@@ -548,7 +517,6 @@ to adhereToLaneRules [ ruleType ]
     set next-speed currentMin
   ]
 end
-
 ; *********** End Perform Actions ************8
 
 to decideBestAction
@@ -608,7 +576,7 @@ to-report getChosenActionValue
   ;; how does this differ from our adjusted value?
 
   set chosenActionValue abs ( tmp-next-speed - itsAdjustedSpeed )
-
+  report 1
 end
 to-report decideBestTravelTimeAction
 
@@ -654,7 +622,6 @@ to-report decideBestTravelTimeAction
   report ""
 
 end
-
 to-report decideBestEmissionAction
   let currentLaneMin 0
   let currentLaneMax 0
@@ -696,15 +663,15 @@ to-report decideBestEmissionAction
 
   report ""
 end
-
 to-report decideBestCongestionAction
   let currentLaneMin 0
   let currentLaneMax 0
+  let tmpFactor 2 ; consider changing or adding to paper
   let cAw congestionAwareness
   let rLC currentLaneRelativeCongestion
-  let laneNCost ( ( cAw * ( 1 - rLC ) ) )
-  let laneNPlus1Cost  ( ( cAw * ( 1 - laneAboveRelativeCongestion ) ) ) ; an unfeasable lane is set to '1' (full), so: this equates to zero
-  let laneNMinus1Cost  ( ( cAw * ( 1 - laneBelowRelativeCongestion ) ) )
+  let laneNCost ( ( cAw * tmpFactor * ( 1 - rLC ) ) )
+  let laneNPlus1Cost  ( ( cAw * tmpFactor * ( 1 - laneAboveRelativeCongestion ) ) ) ; an unfeasable lane is set to '1' (full), so: this equates to zero
+  let laneNMinus1Cost  ( ( cAw * tmpFactor * ( 1 - laneBelowRelativeCongestion ) ) )
 
   let adjustedSpeed preferred-speed
 
@@ -718,33 +685,14 @@ to-report decideBestCongestionAction
 
   set adjustedSpeed (preferred-speed + upLaneCongCost)
 
-
-  show "preferred-speed"
-  show preferred-speed
-
-  show "upLaneCongCost"
-  show upLaneCongCost
-
-  show "adjustedSpeed"
-  show adjustedSpeed
-
-  show "downLaneCongCost"
-  show downLaneCongCost
-
   if( currentLaneMax < ( adjustedSpeed ) )[
     ;; this lane is too slow for us
     if canMoveUp [
       report "moveUp"
     ]
-    if canAccelerate [
-      report "accelerate"
-    ]
   ]
 
   set adjustedSpeed (preferred-speed - downLaneCongCost)
-
-    show "adjustedSpeed"
-  show adjustedSpeed
 
   ;; is this lane too fast for me?
   if( currentLaneMin > ( adjustedSpeed ) )[
@@ -752,12 +700,21 @@ to-report decideBestCongestionAction
     if canMoveDown [
       report "moveDown"
     ]
+]
+  ;; ok so we didnt go up or down... so lets just accelerate or decelerate based on our preffered speed
+  
+  if( current-speed > preferred-speed )[
     if canDecelerate [
       report "decelerate"
     ]
-
   ]
-
+  
+  if( current-speed < preferred-speed )[
+    if canAccelerate [
+      report "accelerate"
+    ]
+  ]
+  
   if ( current-speed = preferred-speed ) and canMaintainSpeed [
     report "maintainSpeed"
   ]
@@ -766,58 +723,59 @@ to-report decideBestCongestionAction
 
 end
 
-to-report getValueOfObjectiveAction [ objectiveType ]; car procedure
-                                                     ; this procedure reports the value that a vehicle places on a decision
-  let decidedAction ""
-  if( objectiveType = "travelTime" ) [
-    set decidedAction decideBestTravelTimeAction
-  ]
-
-  if( objectiveType = "emission" ) [
-    set decidedAction decideBestEmissionAction
-  ]
-
-  if( objectiveType = "congestion" ) [
-    set decidedAction decideBestEmissionAction ;TODO --- change to congestion after fixing congestion --- also change where this was copied from too
-  ]
-
-  decideBestAction ; reset whatever they had before
-
-end
 to resolveArguments ; car procedure
   let resolvedAllArguments false
-
-  if (laneChange) [
-    ;; We are a vehicle that is changing lanes. Congrats!
-    ; the current protocol is as follows:
-
-    ; 1. resolve any cuttoff arguments
-    ; 1.1. ask car im cutting off if its ok to cut them off
-
-    ;; there is someone we will cut off, argue with him/her!
-    ; createDialogue["open"]["cutoff"][true]
-    ;; dialogue created, get the other vehicles response
-    ; let response getCarResponse
-
+      
+  if (NOT laneChange) [
+    ; is there anyone below and back?
+    if (getCarBelowAndBack != nobody) [
+      ; A = <move, sender, receiver>
+      let act createAction "cutoff" self getCarBelowAndBack
+      ; AR = <A, V>
+      let arg createArgument act getChosenActionValue ; if arguing for two different vehicles to do things in the future, MUST change the value part here
+      ; D = <I, AR>
+      let dialog createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy
+    ]
   ]
 
 end
-to createDialogue [ move actionType stanceForVal ] ; car procedure
-                                                   ; create dialogue
 
-  ; D = <I, M, AR>
+to-report createAction [ move sender receiver ]
+  ; do some processing in future?
+  let act []
+  set act lput move act
+  set act lput sender act
+  set act lput receiver act
+  report act
+end
+to-report createArgument [ act val ]
+  let arg []
+  set arg lput act arg
+  set arg lput val arg
+  report arg
+end
+to-report createDialogue [ identity arg ]
+  let dlg []
+  set dlg lput identity dlg
+  set dlg lput arg dlg
+  show dlg
+  report dlg
+end
+to createDialoguessd [ move actionType stanceForVal ] ; car procedure
+     ; D = <I, M, AR>
   ; Dialogue = <Agent Identity, Move Type, Argument>
   set agentIdentity self
   set moveType move
 
-  ; AR = <A, V, S>
-  ; Argument = <Action, Value, Stance for or against ( + | - )
+  ; AR = <A, V>
+  ; Argument = <Action, Value>
   set action actionType
   set value chosenActionValue
-  set stance stanceForVal
+  set stance stanceForVal                                                ; create dialogue
+
+
 
 end
-
 to-report getCarResponse
   ;; car we are cutting off will do three things
   ; 1. generates value of next best action if he loses
@@ -869,11 +827,9 @@ to-report getCarResponse
 
 
 end
-
 to waitForTurnEnd
 
 end
-
 to performAction
   ;; 5 possible actions
 
@@ -890,9 +846,6 @@ to performAction
   adjustSpeed
 
 end
-
-
-
 ; ******* Evaluating Environmental Conditions ***************;
 to-report getWorldMaxSpeed
   let worldMax 0
@@ -919,7 +872,6 @@ to-report getWorldCongestion
   report totalWorldCongestion
 
 end
-
 to-report getWorldEmission
   let totalWorldEmission 0
 
@@ -957,7 +909,6 @@ to-report getCarAhead ; car procedure
   ]
   report carVar
 end
-
 to-report getCarAbove ; car procedure
   let carVar nobody
   let y 0
@@ -978,7 +929,6 @@ to-report getCarAbove ; car procedure
   ]
   report carVar
 end
-
 to-report getCarFarAbove ; car procedure
   let carVar nobody
   let y 0
@@ -1044,7 +994,6 @@ to-report getCarBelow; car procedure
   ]
   report carVar
 end
-
 to-report getCarAboveAndBack ; car procedure
   let carVar nobody
   let y 0
@@ -1065,7 +1014,6 @@ to-report getCarAboveAndBack ; car procedure
   ]
   report carVar
 end
-
 to-report getCarBelowAndBack ; car procedure
   let carVar nobody
   let y 0
@@ -1099,13 +1047,29 @@ to-report getCarFarBelow; car procedure
       ask cars-on patch xcor y [
         set carVar self
       ]
-
+      
     ]
-
+    
   ]
   report carVar
 end
-
+to-report getCarAcrossFromMe
+  
+  ifelse(current-lane-id = lane-slow-id) [ ;; we are in the bottom lane
+                                           ;; so, get car (if any) from fast-lane
+    report getCarFarAbove
+  ] [
+    ifelse(current-lane-id = lane-fast-id) [ ;; we are in the top lane
+                                             ;; so, get car (if any) from slow-lane
+      report getCarFarBelow
+    ] [
+      ; else, we are in the middle, not possible! report nobody
+      report nobody
+    ]
+  ]
+  
+  report nobody
+end
 to initializeCarParameters
   ; * Note: does not initialize all yet
 
@@ -1204,7 +1168,6 @@ to displayCar
   show currentPriority
 end
 ; ******* Performing Actions ***************
-
 to adjustSpeed  ; car procedure
                 ; this is where we ACTUALLY adjust the speed
   let carAhead getCarAhead
@@ -1223,8 +1186,6 @@ to adjustSpeed  ; car procedure
   set current-speed next-speed
   fd current-speed
 end
-
-
 to adjustLane ; car procedure
 
   ; changing lanes
@@ -1259,13 +1220,7 @@ to adjustLane ; car procedure
   ]
 
 end
-
-
-
-
-
 ;*********************** SETUP Car Placement and Initialization of Parameters *********************************
-
 to setup-cars
 
   let line (max-pycor * 2 / 3)
@@ -1281,8 +1236,6 @@ to setup-cars
     ]
   ]
 end
-
-
 to setup-traffic [ direction ]
   let laneOneAmount 0
   let laneTwoAmount 0
@@ -1476,17 +1429,13 @@ to setup-traffic [ direction ]
     avoid-collision
   ]
 end
-
-
 ; ********** basic setup collission avoidance ***************
-
 to separate-cars ;; turtle procedure
   if any? other turtles-here [
     fd 2
     separate-cars
   ]
 end
-
 to avoid-collision
   set loop-counter (loop-counter + 1)
   let max-iterations 25
@@ -1498,28 +1447,23 @@ to avoid-collision
     ]
   ]
 end
-
 ;*********************** DISPLAY *********************************
-
 to setup-display
   setup-dividers
   setup-grass
 end
-
 to setup-median
   ask patches [
     if (pycor = 0)
     [ set pcolor 9.9 ]
   ]
 end
-
 to setup-dividers
   let line (max-pycor * 2 / 3)
 
   setup-divider (max-pycor - line)
   setup-divider (min-pycor + line)
 end
-
 to setup-divider [ y ]
   create-dividers 1 [
     set shape "line"
@@ -1541,14 +1485,12 @@ to setup-divider [ y ]
   ]
   ask dividers [ die ] ;don't need the line painting agents any longer
 end
-
 to paint-line [ line-length line-spacing ]
   pen-down
   forward line-length
   pen-up
   forward line-spacing
 end
-
 to setup-grass
   ask patches [
     if (pycor > (max-pycor - 1) or pycor < (min-pycor + 1))
