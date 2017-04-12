@@ -20,6 +20,8 @@ globals [
   debug
   conflicts
   worldEmissionLevel
+  VOTE_FOR
+  VOTE_AGAINST
 ]
 
 extensions [array table]
@@ -108,13 +110,13 @@ cars-own [
 
   ; whats the current adjusted speed based on objective
   itsAdjustedSpeed
-  
+
   ; speed -- how aggressive am i ( .1 to 1 )
   agressive
-  
+
   ; for when all of the arguments are resolved -- they could just be waiting to be attacked
   resolvedArguments
-  
+
   ;;;;;;;;;; argumentation ;;;;;;;;;;;;
 
   ; D = <I, M, AR>
@@ -238,6 +240,9 @@ end
 ;*********************** SETUP & GO *********************************
 to setup
   clear-all
+  set VOTE_FOR true
+  set VOTE_AGAINST false
+  
   set debug false
   setup-display
   setup-lanes ; do before cars, cars drive in lanes, duh
@@ -292,15 +297,9 @@ to cars-drive
   if debug [
     show "Resolving arguments...."
   ]
-  ask cars [
-    if not dummy [
-      if(not laneChange) [
-        resolveArguments
-      ]
-      
-      waitForTurnEnd
-    ]
-  ]
+  
+  resolveArguments ; resolves all car arguments
+  
   if debug [
     show "Performing action...."
   ]
@@ -703,19 +702,19 @@ to-report decideBestCongestionAction
     ]
 ]
   ;; ok so we didnt go up or down... so lets just accelerate or decelerate based on our preffered speed
-  
+
   if( current-speed > preferred-speed )[
     if canDecelerate [
       report "decelerate"
     ]
   ]
-  
+
   if( current-speed < preferred-speed )[
     if canAccelerate [
       report "accelerate"
     ]
   ]
-  
+
   if ( current-speed = preferred-speed ) and canMaintainSpeed [
     report "maintainSpeed"
   ]
@@ -726,25 +725,43 @@ end
 to-report getActionValue [ act ] ; car procedure
   ; start at 1, ding for anything we dont like
   let actionValue 1
-  let dingAmount 0.1
+  
   
   ;;;; Travel Time Objective
   if ( currentPriority = "travelTime" ) [
+    let dingAmount travelTimeAggresiveness
     set actionValue getTravelTimeActionValue act actionValue dingAmount
   ]
   ;;;; congestion Objective
   if ( currentPriority = "congestion" ) [
+    let dingAmount congestionAwareness
     set actionValue getCongestionActionValue act actionValue dingAmount
   ]
   ;;;; emission Objective -- TODO
   if ( currentPriority = "emission" ) [
+    let dingAmount emissionFriendliness
     set actionValue getTravelTimeActionValue act actionValue dingAmount
   ]
   
-  
-  ;;; does it affect the emmission levels?
-  
   report actionValue
+end
+to-report getActionApproval [ act ]
+  let decision VOTE_AGAINST 
+  let val getActionValue act
+  let acceptLimit (1 - (cooperativeness-rating / 10))
+  
+  if( val >= acceptLimit ) [
+    set decision VOTE_FOR
+  ]
+  
+  show "Val:"
+  show val
+  show "acceptLimit:"
+  show acceptLimit
+  show "dec:"
+  show decision
+  
+  report decision
 end
 to-report getCongestionActionValue [ act actionValue dingAmount ]
   ;;;; what is the value of this action with relation to me?
@@ -754,7 +771,7 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
   let sender (item 1 act)
   let receiver (item 2 act)
   ;;; does it affect MY lane congestion?
-  
+
   ;;;; is the sender trying to enter my lane?
   let senderLaneId 0
   let receiverLaneId 0
@@ -764,22 +781,22 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
   ask receiver [
     set receiverLaneId current-lane-id
   ]
-  
+
   ;; entering through cutoff
   if ( move = "cutoff" ) [
     if( receiverLaneId = current-lane-id ) [
-      ;; oh heck no! 
-      set actionValue (actionValue - dingAmount) 
+      ;; oh heck no!
+      set actionValue (actionValue - dingAmount)
       show "CNG Ding: due to car entering my lane through cutoff!"
     ]
   ]
-  
+
   ;; entering through rightOfWay
   if ( move = "rightOfWay" ) [
     ;; this only happens when the sender and receiver are on two separate lanes
     if( lane-medium-id = current-lane-id ) [
-      ;; oh heck no! 
-      set actionValue (actionValue - dingAmount) 
+      ;; oh heck no!
+      set actionValue (actionValue - dingAmount)
       show "CNG Ding: due to car entering my lane through rightOfWay!"
     ]
   ]
@@ -793,9 +810,9 @@ to-report getTravelTimeActionValue [ act actionValue dingAmount ]
   let sender (item 1 act)
   let receiver (item 2 act)
   ;;; does this action affect MY speed?
-  
+
   ;; will the vehicle cut me off? Or is this vehicle in the way of me going to another lane?
-  
+
   ; cutting me off
   if( receiver = self AND move = "cutoff") [
     show "Im being cutoff!"
@@ -805,18 +822,18 @@ to-report getTravelTimeActionValue [ act actionValue dingAmount ]
     ask sender [
       set senderLaneId current-lane-id
     ]
-    
+
     ;; fast lane is currently 4, med 3, slow 2
     if ( senderLaneId > current-lane-id) [
-      ; they are coming from a faster lane, they will assume the max speed, don't worry about them for now TODO: worry about them if they have an adjusted preferred speed below yoours 
-    ] 
+      ; they are coming from a faster lane, they will assume the max speed, don't worry about them for now TODO: worry about them if they have an adjusted preferred speed below yoours
+    ]
     if ( senderLaneId < current-lane-id ) [
       ; they are coming from a slower lane, this is a ding. we dont want to go slower, we are travel time biased!
-      set actionValue (actionValue - dingAmount) 
+      set actionValue (actionValue - dingAmount)
       show "TT Ding: due to being cutoff from a car coming from slower lane"
     ]
   ]
-  
+
   ; the other vehicle is taking the spot I want
   if( receiver = self AND move = "rightOfWay") [
     show "They're taking a lane i could take!"
@@ -833,39 +850,145 @@ to-report getTravelTimeActionValue [ act actionValue dingAmount ]
       if ( chosenAction = "moveUp" ) [
         ; They are taking my spot!
         ; A travel time agent does NOT agree with this
-        set actionValue (actionValue - dingAmount) 
-        show "TT Ding: due to car taking lane position i want"  
+        set actionValue (actionValue - dingAmount)
+        show "TT Ding: due to car taking lane position i want"
       ]
-    ] 
-    
+    ]
+
     if ( senderLaneId < current-lane-id ) [
       ; they are coming from a slower lane
       ; do I currently want to move down?
       if ( chosenAction = "moveDown" ) [
         ; They are taking my spot!
         ; A travel time agent does NOT agree with this
-        set actionValue (actionValue - dingAmount) 
-        show "TT Ding: due to car taking lane position i want"  
+        set actionValue (actionValue - dingAmount)
+        show "TT Ding: due to car taking lane position i want"
       ]
     ]
   ]
   report actionValue
 end
-to resolveArguments ; car procedure
-  let resolvedAllArguments false
-  let dialogueAcross nobody
-  let dialogueCutoff nobody
+to resolveArguments
+  ; 1. Generate set of all AR, n
+  ; 2. Resolve n through one of the two argumentation schemes
+  let n [] ; empty list
+           ; each lane change agent must generate an AR
   
-  ifelse (NOT laneChange) [ ;; TODO: change this and where resolveArg is called back to if (laneChange)
-                            ; is there anyone below and back?
+  ask cars [
+    foreach generateLaneChangeRequests [ [newArg] -> 
+      set n lput newArg n 
+    ]
+  ]
+  ; show "---------N List:----------- "
+  ; show n
+  ; show "---------End N List:----------- "
+  
+  
+  
+  if ( argumentationScheme = "socialAbstractArgumentation" ) [
+    ; AR = <A, V> -- argument
+    ; V : "vote" for (+) or against (-) the action (+1 and -1 for this code) 
+    ; A : "action" to be taken
+    ; A = <M, R> -- action
+    ; M : "cutoff" or "rightOfWay"
+    ; R : attack relation of <a,b> where a attacks b , a --> b
+    ; F = <I, n> -- framework
+    ; I : set of all agents
+    ; n : set of all arguments
+    ; S = <Y, m> -- semantic framework
+    ; Y : an evaluation function of the framework
+    ; m : an evaluation function for each argument w.r.t. the total agent set
+    ; X : result of semantic framework, these are the agents that were approved for lane change
+    
+    let F createFramework sort cars n
+    show "---------F List:----------- "
+    show F
+    show "---------End F List:----------- "
+    
+    let X phiFunction F
+    
+  ]
+  if ( argumentationScheme = "dialogueArgumentation") [
+    ;; protocol for the dialogue is to:
+    ; 1. Send our Dialogue to vehicle we are cutting off
+    ; 2. The individual immediately either accepts or rejects our offer
+    ; 2.1. Accept --> We move On
+    ; 2.2. Reject --> We Stop. Update our Inference System with this new information. Regenerate feasibleActions and new chosenAction. Then start back at 1 if needed
+    ; 3. Send our Dialogue to vehicle we want right of way with
+    ; 4. The individual immediately either accepts or rejects our offer
+    ; 4.1. Accept --> We move On
+    ; 4.2. Reject --> We Stop. Update our Inference System with this new information. Regenerate feasibleActions and new chosenAction. Then start back at 1 if needed
+    ; 5. We won all of our arguments, so we mark that we are done arguing for our lane and wait for the end of the turn
+    
+    ; 1
+    
+  ]
+  
+  
+end
+to-report phiFunction [ f ]
+  let I (item 0 f)
+  let n (item 1 f)
+  let X []
+  
+  while [n != []]
+  [ 
+    ;; loop through the args in n
+    ;; gather group consensus for each arg in n
+    foreach n [ [AR] -> 
+      
+      let test mewFunction I AR
+      
+      
+    ]
+    set n []
+  ]
+  
+  report X
+end
+to-report mewFunction [ I AR ]
+  ; I --> set of all agents
+  ; AR --> the argument to be evaluated w.r.t. the group
+  ; A --> the action pertaining to the argument
+  let A (item 0 AR)
+  let decision VOTE_AGAINST
+  let votesFor 0
+  let votesAgainst 0
+  
+  foreach I [ [agnt] -> 
+    
+    ask agnt [
+     show getActionApproval A 
+    ]
+    
+    
+  ]
+  report decision
+end
+to-report createFramework [vehicles n]
+  let tmpF []
+  set tmpF lput vehicles tmpF
+  set tmpF lput n tmpF
+  report tmpF
+end
+to-report generateLaneChangeRequests ; car procedure
+  let acrossArg nobody
+  let cutoffArg nobody
+  let argList []
+  if (laneChange) [ ;;; TODO: Remove the not after debugging
+                        ; To generate an argument:
+                        ; 1. A
+                        ; 1.1. Move
+                        ; 1.1.1 cutoff of rightofway
+                        ; 1.2. Relation
+                        ; 1.2.1 self as the aggressor and vehicle affected as the defender
+                        ; 2. V --> here we default to +1 due to we are the ones making the lane change
     if ( chosenAction = "moveDown" ) [
       if (getCarBelowAndBack != nobody) [
         ; A = <move, sender, receiver> OR A = <move, Relation>
         let act createAction "cutoff" self getCarBelowAndBack
         ; AR = <A, V>
-        let arg createArgument act (getActionValue act) ; if arguing for two different vehicles to do things in the future, MUST change the value part here
-                                                        ; D = <I, AR>
-        set dialogueCutoff createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy
+        set cutoffArg createArgument act VOTE_FOR
       ]
     ]
     if ( chosenAction = "moveUp" ) [
@@ -875,9 +998,7 @@ to resolveArguments ; car procedure
         ; A = <move, sender, receiver>
         let act createAction "cutoff" self getCarAboveAndBack
         ; AR = <A, V>
-        let arg createArgument act getChosenActionValue ; if arguing for two different vehicles to do things in the future, MUST change the value part here
-                                                        ; D = <I, AR>
-        set dialogueCutoff createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy
+        set cutoffArg createArgument act VOTE_FOR 
       ] 
     ]
     
@@ -885,78 +1006,28 @@ to resolveArguments ; car procedure
       ; A = <move, sender, receiver>
       let act createAction "rightOfWay" self getCarAcrossFromMe
       ; AR = <A, V>
-      let arg createArgument act (getActionValue act) ; if arguing for two different vehicles to do things in the future, MUST change the value part here
-                                                      ; D = <I, AR>
-      set dialogueAcross createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy      
+      set acrossArg createArgument act VOTE_FOR
     ]
     
-    ;;;; are there any interested parties?
-    ifelse (( dialogueAcross = nobody) AND (dialogueCutoff = nobody ) ) [
-      ;; nobody to argue, I won already
-      set resolvedArguments true 
-    ] [
-      ;; some arguments are there, get ready to rumble!
-      ifelse ( argumentationScheme = "socialAbstractArgumentation" ) [
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-      ] [
-        if ( argumentationScheme = "dialogueArgumentation") [
-          ;; protocol for the dialogue is to:
-          ; 1. Send our Dialogue to vehicle we are cutting off
-          ; 2. The individual immediately either accepts or rejects our offer
-          ; 2.1. Accept --> We move On
-          ; 2.2. Reject --> We Stop. Update our Inference System with this new information. Regenerate feasibleActions and new chosenAction. Then start back at 1 if needed
-          ; 3. Send our Dialogue to vehicle we want right of way with
-          ; 4. The individual immediately either accepts or rejects our offer
-          ; 4.1. Accept --> We move On
-          ; 4.2. Reject --> We Stop. Update our Inference System with this new information. Regenerate feasibleActions and new chosenAction. Then start back at 1 if needed
-          ; 5. We won all of our arguments, so we mark that we are done arguing for our lane and wait for the end of the turn
-          
-          ; 1
-          if ( dialogueAcross != nobody ) [
-            let acrossDialogueResponse (getReceivingAgentResponse dialogueAcross)
-            let otherAgentValue (item 1 (item 1 acrossDialogueResponse ))
-            let myValue (item 1 (item 1 dialogueAcross ))
-            
-            show "my"
-            show myValue
-            show "theirs"
-            show otherAgentValue
-            
-          ]
-        ]
-      ]
-    ]
-    
-    
-    
-    
-    
-    
-    
-    
-  ] [
-    set resolvedArguments true  
+  ] 
+  ;show "ChosenAction:"
+  ;show chosenAction
+  ;show "Across:"
+  ;show acrossArg
+  ;show "Cutoff:"
+  ;show cutoffArg
+  if( acrossArg != nobody ) [
+    set argList lput acrossArg argList
   ]
-
-
+  if( cutoffArg != nobody) [
+    set argList lput cutoffArg argList
+  ]
+  ;show "---------Arg List:----------- "
+ ; show argList
+  ;show "---------End Arg List:----------- "
+  report argList
 end
 to-report getReceivingAgentResponse [ dialogue ]
-  show "Evaluating Dialogue"
-  show dialogue
-  ;; what does the recipient think of this dialogue?
-  show "recipient"
-  
   let receiver (item 2 (item 0 (item 1 dialogue )))
   let response nobody
   
@@ -972,10 +1043,9 @@ to-report getReceivingAgentResponse [ dialogue ]
     
     ; AR = <A, V>
     let arg createArgument act val ; if arguing for two different vehicles to do things in the future, MUST change the value part here
-                                                    ; D = <I, AR>
+                                   ; D = <I, AR>
     set response createDialogue self arg
   ]
-  show response
   report response
 end
 to-report createAction [ move sender receiver ]
@@ -1269,14 +1339,14 @@ to-report getCarFarBelow; car procedure
       ask cars-on patch xcor y [
         set carVar self
       ]
-      
+
     ]
-    
+
   ]
   report carVar
 end
 to-report getCarAcrossFromMe
-  
+
   ifelse(current-lane-id = lane-slow-id) [ ;; we are in the bottom lane
                                            ;; so, get car (if any) from fast-lane
     report getCarFarAbove
@@ -1289,7 +1359,7 @@ to-report getCarAcrossFromMe
       report nobody
     ]
   ]
-  
+
   report nobody
 end
 to initializeCarParameters
