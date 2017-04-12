@@ -19,7 +19,6 @@ globals [
   	lane-slow-ypos
   debug
   conflicts
-
   worldEmissionLevel
 ]
 
@@ -109,11 +108,13 @@ cars-own [
 
   ; whats the current adjusted speed based on objective
   itsAdjustedSpeed
-
+  
   ; speed -- how aggressive am i ( .1 to 1 )
   agressive
-
-
+  
+  ; for when all of the arguments are resolved -- they could just be waiting to be attacked
+  resolvedArguments
+  
   ;;;;;;;;;; argumentation ;;;;;;;;;;;;
 
   ; D = <I, M, AR>
@@ -722,24 +723,261 @@ to-report decideBestCongestionAction
   report ""
 
 end
-
-to resolveArguments ; car procedure
-  let resolvedAllArguments false
-      
-  if (NOT laneChange) [
-    ; is there anyone below and back?
-    if (getCarBelowAndBack != nobody) [
-      ; A = <move, sender, receiver>
-      let act createAction "cutoff" self getCarBelowAndBack
-      ; AR = <A, V>
-      let arg createArgument act getChosenActionValue ; if arguing for two different vehicles to do things in the future, MUST change the value part here
-      ; D = <I, AR>
-      let dialog createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy
+to-report getActionValue [ act ] ; car procedure
+  ; start at 1, ding for anything we dont like
+  let actionValue 1
+  let dingAmount 0.1
+  
+  ;;;; Travel Time Objective
+  if ( currentPriority = "travelTime" ) [
+    set actionValue getTravelTimeActionValue act actionValue dingAmount
+  ]
+  ;;;; congestion Objective
+  if ( currentPriority = "congestion" ) [
+    set actionValue getCongestionActionValue act actionValue dingAmount
+  ]
+  ;;;; emission Objective -- TODO
+  if ( currentPriority = "emission" ) [
+    set actionValue getTravelTimeActionValue act actionValue dingAmount
+  ]
+  
+  
+  ;;; does it affect the emmission levels?
+  
+  report actionValue
+end
+to-report getCongestionActionValue [ act actionValue dingAmount ]
+  ;;;; what is the value of this action with relation to me?
+  ; A = <move, sender, receiver> ---- Note: I may not be either. I may just be an observing party
+  ; parse act
+  let move (item 0 act)
+  let sender (item 1 act)
+  let receiver (item 2 act)
+  ;;; does it affect MY lane congestion?
+  
+  ;;;; is the sender trying to enter my lane?
+  let senderLaneId 0
+  let receiverLaneId 0
+  ask sender [
+    set senderLaneId current-lane-id
+  ]
+  ask receiver [
+    set receiverLaneId current-lane-id
+  ]
+  
+  ;; entering through cutoff
+  if ( move = "cutoff" ) [
+    if( receiverLaneId = current-lane-id ) [
+      ;; oh heck no! 
+      set actionValue (actionValue - dingAmount) 
+      show "CNG Ding: due to car entering my lane through cutoff!"
     ]
   ]
+  
+  ;; entering through rightOfWay
+  if ( move = "rightOfWay" ) [
+    ;; this only happens when the sender and receiver are on two separate lanes
+    if( lane-medium-id = current-lane-id ) [
+      ;; oh heck no! 
+      set actionValue (actionValue - dingAmount) 
+      show "CNG Ding: due to car entering my lane through rightOfWay!"
+    ]
+  ]
+  report actionValue
+end
+to-report getTravelTimeActionValue [ act actionValue dingAmount ]
+  ;;;; what is the value of this action with relation to me?
+  ; A = <move, sender, receiver> ---- Note: I may not be either. I may just be an observing party
+  ; parse act
+  let move (item 0 act)
+  let sender (item 1 act)
+  let receiver (item 2 act)
+  ;;; does this action affect MY speed?
+  
+  ;; will the vehicle cut me off? Or is this vehicle in the way of me going to another lane?
+  
+  ; cutting me off
+  if( receiver = self AND move = "cutoff") [
+    show "Im being cutoff!"
+    ;; I'm being cutoff! But will this affect my speed?
+    ;;; ASSUMPTION: The vehicle cutting me off is going to assume the min or max based on where the vehicle is coming from
+    let senderLaneId 0
+    ask sender [
+      set senderLaneId current-lane-id
+    ]
+    
+    ;; fast lane is currently 4, med 3, slow 2
+    if ( senderLaneId > current-lane-id) [
+      ; they are coming from a faster lane, they will assume the max speed, don't worry about them for now TODO: worry about them if they have an adjusted preferred speed below yoours 
+    ] 
+    if ( senderLaneId < current-lane-id ) [
+      ; they are coming from a slower lane, this is a ding. we dont want to go slower, we are travel time biased!
+      set actionValue (actionValue - dingAmount) 
+      show "TT Ding: due to being cutoff from a car coming from slower lane"
+    ]
+  ]
+  
+  ; the other vehicle is taking the spot I want
+  if( receiver = self AND move = "rightOfWay") [
+    show "They're taking a lane i could take!"
+    ;; Theyre taking a lane i could take! But will this affect my speed?
+    let senderLaneId 0
+    ask sender [
+      set senderLaneId current-lane-id
+    ]
+    
+    ;; fast lane is currently 4, med 3, slow 2
+    if ( senderLaneId > current-lane-id) [
+      ; they are coming from a faster lane
+      ; do I currently want to move up?
+      if ( chosenAction = "moveUp" ) [
+        ; They are taking my spot!
+        ; A travel time agent does NOT agree with this
+        set actionValue (actionValue - dingAmount) 
+        show "TT Ding: due to car taking lane position i want"  
+      ]
+    ] 
+    
+    if ( senderLaneId < current-lane-id ) [
+      ; they are coming from a slower lane
+      ; do I currently want to move down?
+      if ( chosenAction = "moveDown" ) [
+        ; They are taking my spot!
+        ; A travel time agent does NOT agree with this
+        set actionValue (actionValue - dingAmount) 
+        show "TT Ding: due to car taking lane position i want"  
+      ]
+    ]
+  ]
+  report actionValue
+end
+to resolveArguments ; car procedure
+  let resolvedAllArguments false
+  let dialogueAcross nobody
+  let dialogueCutoff nobody
+  
+  ifelse (NOT laneChange) [ ;; TODO: change this and where resolveArg is called back to if (laneChange)
+                            ; is there anyone below and back?
+    if ( chosenAction = "moveDown" ) [
+      if (getCarBelowAndBack != nobody) [
+        ; A = <move, sender, receiver> OR A = <move, Relation>
+        let act createAction "cutoff" self getCarBelowAndBack
+        ; AR = <A, V>
+        let arg createArgument act (getActionValue act) ; if arguing for two different vehicles to do things in the future, MUST change the value part here
+                                                        ; D = <I, AR>
+        set dialogueCutoff createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy
+      ]
+    ]
+    if ( chosenAction = "moveUp" ) [
+      
+      ; is there anyone below and back?
+      if (getCarAboveAndBack != nobody) [
+        ; A = <move, sender, receiver>
+        let act createAction "cutoff" self getCarAboveAndBack
+        ; AR = <A, V>
+        let arg createArgument act getChosenActionValue ; if arguing for two different vehicles to do things in the future, MUST change the value part here
+                                                        ; D = <I, AR>
+        set dialogueCutoff createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy
+      ] 
+    ]
+    
+    if (getCarAcrossFromMe != nobody ) [
+      ; A = <move, sender, receiver>
+      let act createAction "rightOfWay" self getCarAcrossFromMe
+      ; AR = <A, V>
+      let arg createArgument act (getActionValue act) ; if arguing for two different vehicles to do things in the future, MUST change the value part here
+                                                      ; D = <I, AR>
+      set dialogueAcross createDialogue self arg  ; // open should be the first, but we are asserting (because we are assuming the other car wont be busy      
+    ]
+    
+    ;;;; are there any interested parties?
+    ifelse (( dialogueAcross = nobody) AND (dialogueCutoff = nobody ) ) [
+      ;; nobody to argue, I won already
+      set resolvedArguments true 
+    ] [
+      ;; some arguments are there, get ready to rumble!
+      ifelse ( argumentationScheme = "socialAbstractArgumentation" ) [
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+      ] [
+        if ( argumentationScheme = "dialogueArgumentation") [
+          ;; protocol for the dialogue is to:
+          ; 1. Send our Dialogue to vehicle we are cutting off
+          ; 2. The individual immediately either accepts or rejects our offer
+          ; 2.1. Accept --> We move On
+          ; 2.2. Reject --> We Stop. Update our Inference System with this new information. Regenerate feasibleActions and new chosenAction. Then start back at 1 if needed
+          ; 3. Send our Dialogue to vehicle we want right of way with
+          ; 4. The individual immediately either accepts or rejects our offer
+          ; 4.1. Accept --> We move On
+          ; 4.2. Reject --> We Stop. Update our Inference System with this new information. Regenerate feasibleActions and new chosenAction. Then start back at 1 if needed
+          ; 5. We won all of our arguments, so we mark that we are done arguing for our lane and wait for the end of the turn
+          
+          ; 1
+          if ( dialogueAcross != nobody ) [
+            let acrossDialogueResponse (getReceivingAgentResponse dialogueAcross)
+            let otherAgentValue (item 1 (item 1 acrossDialogueResponse ))
+            let myValue (item 1 (item 1 dialogueAcross ))
+            
+            show "my"
+            show myValue
+            show "theirs"
+            show otherAgentValue
+            
+          ]
+        ]
+      ]
+    ]
+    
+    
+    
+    
+    
+    
+    
+    
+  ] [
+    set resolvedArguments true  
+  ]
+
 
 end
-
+to-report getReceivingAgentResponse [ dialogue ]
+  show "Evaluating Dialogue"
+  show dialogue
+  ;; what does the recipient think of this dialogue?
+  show "recipient"
+  
+  let receiver (item 2 (item 0 (item 1 dialogue )))
+  let response nobody
+  
+  ask receiver [
+    let move (item 0 (item 0 (item 1 dialogue )))
+    let sender (item 1 (item 0 (item 1 dialogue )))
+    
+    ; A = <move, sender, receiver> OR A = <move, Relation>
+    let act createAction move sender receiver
+    
+    let val (getActionValue act)
+    let identity self
+    
+    ; AR = <A, V>
+    let arg createArgument act val ; if arguing for two different vehicles to do things in the future, MUST change the value part here
+                                                    ; D = <I, AR>
+    set response createDialogue self arg
+  ]
+  show response
+  report response
+end
 to-report createAction [ move sender receiver ]
   ; do some processing in future?
   let act []
@@ -758,23 +996,7 @@ to-report createDialogue [ identity arg ]
   let dlg []
   set dlg lput identity dlg
   set dlg lput arg dlg
-  show dlg
   report dlg
-end
-to createDialoguessd [ move actionType stanceForVal ] ; car procedure
-     ; D = <I, M, AR>
-  ; Dialogue = <Agent Identity, Move Type, Argument>
-  set agentIdentity self
-  set moveType move
-
-  ; AR = <A, V>
-  ; Argument = <Action, Value>
-  set action actionType
-  set value chosenActionValue
-  set stance stanceForVal                                                ; create dialogue
-
-
-
 end
 to-report getCarResponse
   ;; car we are cutting off will do three things
