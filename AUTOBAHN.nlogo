@@ -245,8 +245,8 @@ to setup
   set debug false
   setup-display
   setup-lanes ; do before cars, cars drive in lanes, duh
-  ; setup-cars
-  setup-testCars
+  setup-cars
+  ; setup-testCars
   update-lanes ; determine congestion based on cars placed
   ; watch lead-car
   reset-ticks
@@ -749,8 +749,8 @@ to-report getActionApproval [ act ]
   let decision VOTE_AGAINST
   let val getActionValue act
   let acceptLimit 1; TODO: Take into consideration cooperativeness --> (1 - (cooperativeness-rating / 10))
- show act
-  show val
+ ; show act
+ ;  show val
   if( val >= acceptLimit ) [
     set decision VOTE_FOR
   ]
@@ -781,7 +781,7 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
     if ( senderLaneId = current-lane-id ) [
       ;; he is in my lane! ding!
       set actionValue (actionValue - dingAmount)
-      show "CNG Ding: due to car entering my lane through cutoff!"
+  ;     show "CNG Ding: due to car entering my lane through cutoff!"
     ]
 
 
@@ -801,7 +801,7 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
       if( receiverLaneId = current-lane-id ) [
         ;; oh heck no!
         set actionValue (actionValue - dingAmount)
-        show "CNG Ding: due to car entering my lane through cutoff!"
+      ;   show "CNG Ding: due to car entering my lane through cutoff!"
       ]
     ]
 
@@ -811,7 +811,7 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
       if( lane-medium-id = current-lane-id ) [
         ;; oh heck no!
         set actionValue (actionValue - dingAmount)
-        show "CNG Ding: due to car entering my lane through rightOfWay!"
+        ;  show "CNG Ding: due to car entering my lane through rightOfWay!"
       ]
     ]
   ]
@@ -835,18 +835,18 @@ to-report getSocialArgumentTravelTimeValue [ arg dingAmount ]
 
     if ( getCarAhead = sender ) [
       set val (val - dingAmount)
-      show "TT: moa right in front of me"
+     ;  show "TT: moa right in front of me"
     ]
     if ( getCarAboveAndBack != nobody ) [
       if( ( getCarAboveAndBack = sender ) and chosenAction = "moveUp") [
         set val (val - dingAmount)
-        show "TT: moa moving to where I want to cutoff"
+        ; show "TT: moa moving to where I want to cutoff"
       ]
     ]
     if ( getCarBelowAndBack != nobody ) [
       if( ( getCarBelowAndBack = sender) and chosenAction = "moveDown") [
         set val (val - dingAmount)
-        show "TT: moa moving to where I want to cutoff"
+       ;  show "TT: moa moving to where I want to cutoff"
       ]
     ]
   ]
@@ -864,18 +864,18 @@ to-report getSocialArgumentTravelTimeValue [ arg dingAmount ]
     ]
     if( receiver = self ) [
       set val (val - dingAmount)
-      show "TT: cutoff right in front of me"
+     ;  show "TT: cutoff right in front of me"
     ]
     if( getCarAcrossFromMe = sender AND ( chosenAction = "moveUp" OR chosenAction = "moveDown" ) ) [
       set val (val - dingAmount)
-      show "CNG: cutoff into lane i want"
+     ;  show "CNG: cutoff into lane i want"
     ]
   ]
   if ( move = "rightOfWay" ) [
     ; rightofway means that there is someone above and someone below wanting to cut me off
     if( getCarAboveAndAhead = sender OR getCarBelowAndAhead = sender ) [
       set val (val - dingAmount)
-      show "TT: rightOfWay right in front of me"
+    ;   show "TT: rightOfWay right in front of me"
     ]
   ]
   report val
@@ -898,18 +898,18 @@ to-report getSocialArgumentEmissionValue [ arg dingAmount ]
 
     if ( senderLaneId != lane-slow-id ) [
       set val (val - dingAmount)
-      show "EM: moa not in slow lane"
+      ; show "EM: moa not in slow lane"
     ]
     if ( getCarAboveAndBack != nobody ) [
       if( ( getCarAboveAndBack = sender ) and chosenAction = "moveUp") [
         set val (val - dingAmount)
-        show "EM: moa moving to where I want to cutoff"
+       ;  show "EM: moa moving to where I want to cutoff"
       ]
     ]
     if ( getCarBelowAndBack != nobody ) [
       if( ( getCarBelowAndBack = sender) and chosenAction = "moveDown") [
         set val (val - dingAmount)
-        show "EM: moa moving to where I want to cutoff"
+       ;  show "EM: moa moving to where I want to cutoff"
       ]
     ]
   ]
@@ -927,7 +927,7 @@ to-report getSocialArgumentEmissionValue [ arg dingAmount ]
     ]
     if( receiverLaneId > senderLaneId ) [
       set val (val - dingAmount)
-      show "EM: cutoff not moving down"
+      ; show "EM: cutoff not moving down"
     ]
   ]
   if ( move = "rightOfWay" ) [
@@ -944,7 +944,7 @@ to-report getSocialArgumentEmissionValue [ arg dingAmount ]
     ]
     if( receiverLaneId > senderLaneId ) [
       set val (val - dingAmount)
-      show "EM: rightOfWay not moving down"
+      ; show "EM: rightOfWay not moving down"
     ]
   ]
   report val
@@ -970,18 +970,18 @@ to-report getSocialArgumentCongestionValue [ arg dingAmount ]
     if ( senderLaneId = current-lane-id ) [
       ;; he is in my lane! ding!
       set val (val - dingAmount)
-      show "CGN: moa staying in my lane"
+      ; show "CGN: moa staying in my lane"
     ]
     if ( getCarAboveAndBack != nobody ) [
       if( ( getCarAboveAndBack = sender ) and chosenAction = "moveUp") [
         set val (val - dingAmount)
-        show "CGN: moa moving to where I want to cutoff"
+        ; show "CGN: moa moving to where I want to cutoff"
       ]
     ]
     if ( getCarBelowAndBack != nobody ) [
       if( ( getCarBelowAndBack = sender)and chosenAction = "moveDown") [
         set val (val - dingAmount)
-        show "CGN: moa moving to where I want to cutoff"
+        ; show "CGN: moa moving to where I want to cutoff"
       ]
     ]
   ]
@@ -1000,17 +1000,17 @@ to-report getSocialArgumentCongestionValue [ arg dingAmount ]
 
     if( receiverLaneId = current-lane-id ) [
       set val (val - dingAmount)
-      show "CNG: cutoff into my lane"
+      ; show "CNG: cutoff into my lane"
     ]
     if( getCarAcrossFromMe = sender AND ( chosenAction = "moveUp" OR chosenAction = "moveDown" ) ) [
       set val (val - dingAmount)
-      show "CNG: cutoff into lane i want"
+     ;  show "CNG: cutoff into lane i want"
     ]
   ]
   if ( move = "rightOfWay" ) [
     if( lane-medium-id = current-lane-id ) [
       set val (val - dingAmount)
-      show "CNG: rightOfWay into my lane"
+      ; show "CNG: rightOfWay into my lane"
     ]
   ]
   report val
@@ -1113,28 +1113,31 @@ to resolveArguments
   ; createArgumentVotes
   set Va generateSocialArgumentVotes A
 
-  show "-----Create Groups ----"
+   show "-----Create Groups ----"
 
   let Rg generateSocialArgumentGroups Va
 
-  foreach Rg [ [g] ->
-    show "Grp"
-    show g
-  ]
+   foreach Rg [ [g] ->
+     
+    if ( length g > 1 ) [
+    show "Contested Grp"
+     show g
+    ]
+   ]
 
-  show "-----End Create Groups----"
+   show "-----End Create Groups----"
 
-  show "-----Reduce Groups ----"
+   show "-----Reduce Groups ----"
 
   let rRg reduceSocialGroups Rg
 
   foreach rRg [ [g] ->
     show "Grp"
-    show g
-  ]
+     show g
+ ]
 
-  show "-----End Reduce Groups----"
-
+ show "-----End Reduce Groups----"
+  
   if ( argumentationScheme = "socialAbstractArgumentation" ) [
 
     ;; for every agent that did not have an accepted action, make them do the only remaining thing, decelerate
@@ -1342,7 +1345,7 @@ to-report makeAttackRelation [ attacker defender ]
 end
 to-report generateSocialArgumentVotes [ args ]
   let Va []
-  show args
+ ; show args
 
   foreach args [ [arg] ->
     let forArg 0
@@ -1360,7 +1363,7 @@ to-report generateSocialArgumentVotes [ args ]
     ; add to list of votes
     set Va lput (createArgumentVotes arg forArg againstArg) Va
   ]
-  show Va
+  ; show Va
 
   report Va
 end
@@ -1505,7 +1508,7 @@ end
 to-report groupsHasGroup [groups group]
   let reportVal false
   foreach groups [ [grp] ->
-    if ( length grp > 1 ) [
+    if ( length grp > 1 AND length group > 1) [
       let elem11 (item 0 grp)
       let elem12 (item 1 grp)
       let elem21 (item 0 group)
@@ -1520,10 +1523,6 @@ to-report groupsHasGroup [groups group]
 end
 to-report listHasItem [ l i ]
   foreach l [ [it] ->
-    show "SearchItem"
-    show i
-    show "List Item"
-    show it
     if( it = i ) [
       report true
     ]
