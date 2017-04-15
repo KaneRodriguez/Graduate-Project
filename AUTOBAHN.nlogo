@@ -769,22 +769,22 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
   let move (item 1 act)
   let receiver (item 2 act)
   ;;; does it affect MY lane congestion?
-  
+
   ifelse ( move = "moa" ) [
     ;; is the sender of the moa in my lane? We want him to get out!
     let senderLaneId 0
-    
+
     ask sender [
       set senderLaneId current-lane-id
-    ]    
-    
-    if ( senderLaneId = current-lane-id ) [
-      ;; he is in my lane! ding! 
-      set actionValue (actionValue - dingAmount)
-      show "CNG Ding: due to car entering my lane through cutoff!"     
     ]
-    
-    
+
+    if ( senderLaneId = current-lane-id ) [
+      ;; he is in my lane! ding!
+      set actionValue (actionValue - dingAmount)
+      show "CNG Ding: due to car entering my lane through cutoff!"
+    ]
+
+
   ] [
     ;;;; is the sender trying to enter my lane?
     let senderLaneId 0
@@ -795,7 +795,7 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
     ask receiver [
       set receiverLaneId current-lane-id
     ]
-    
+
     ;; entering through cutoff
     if ( move = "cutoff" ) [
       if( receiverLaneId = current-lane-id ) [
@@ -804,7 +804,7 @@ to-report getCongestionActionValue [ act actionValue dingAmount ]
         show "CNG Ding: due to car entering my lane through cutoff!"
       ]
     ]
-    
+
     ;; entering through rightOfWay
     if ( move = "rightOfWay" ) [
       ;; this only happens when the sender and receiver are on two separate lanes
@@ -825,29 +825,29 @@ to-report getSocialArgumentTravelTimeValue [ arg dingAmount ]
   let move (item 1 arg)
   let receiver (item 2 arg)
   let val 1
-  
+
   if ( move = "moa" ) [
     let senderLaneId 0
-    
+
     ask sender [
       set senderLaneId current-lane-id
-    ]    
-    
+    ]
+
     if ( getCarAhead = sender ) [
       set val (val - dingAmount)
-      show "TT: moa right in front of me"     
+      show "TT: moa right in front of me"
     ]
     if ( getCarAboveAndBack != nobody ) [
       if( ( getCarAboveAndBack = sender ) and chosenAction = "moveUp") [
         set val (val - dingAmount)
-        show "TT: moa moving to where I want to cutoff"     
+        show "TT: moa moving to where I want to cutoff"
       ]
     ]
     if ( getCarBelowAndBack != nobody ) [
       if( ( getCarBelowAndBack = sender) and chosenAction = "moveDown") [
         set val (val - dingAmount)
-        show "TT: moa moving to where I want to cutoff"     
-      ]   
+        show "TT: moa moving to where I want to cutoff"
+      ]
     ]
   ]
   if ( move = "cutoff" ) [
@@ -855,13 +855,16 @@ to-report getSocialArgumentTravelTimeValue [ arg dingAmount ]
     let receiverLaneId 0
     ask sender [
       set senderLaneId current-lane-id
+      if( chosenAction = "moveDown" ) [
+        set receiverLaneId (current-lane-id - 1)
+      ]
+      if( chosenAction = "moveUp" ) [
+        set receiverLaneId (current-lane-id + 1)
+      ]
     ]
-    ask receiver [
-      set receiverLaneId current-lane-id
-    ]    
     if( receiver = self ) [
       set val (val - dingAmount)
-      show "TT: cutoff right in front of me"     
+      show "TT: cutoff right in front of me"
     ]
     if( getCarAcrossFromMe = sender AND ( chosenAction = "moveUp" OR chosenAction = "moveDown" ) ) [
       set val (val - dingAmount)
@@ -872,7 +875,7 @@ to-report getSocialArgumentTravelTimeValue [ arg dingAmount ]
     ; rightofway means that there is someone above and someone below wanting to cut me off
     if( getCarAboveAndAhead = sender OR getCarBelowAndAhead = sender ) [
       set val (val - dingAmount)
-      show "TT: rightOfWay right in front of me"     
+      show "TT: rightOfWay right in front of me"
     ]
   ]
   report val
@@ -885,29 +888,29 @@ to-report getSocialArgumentEmissionValue [ arg dingAmount ]
   let move (item 1 arg)
   let receiver (item 2 arg)
   let val 1
-  
+
   if ( move = "moa" ) [
     let senderLaneId 0
-    
+
     ask sender [
       set senderLaneId current-lane-id
-    ]    
-    
+    ]
+
     if ( senderLaneId != lane-slow-id ) [
       set val (val - dingAmount)
-      show "EM: moa not in slow lane"     
+      show "EM: moa not in slow lane"
     ]
     if ( getCarAboveAndBack != nobody ) [
       if( ( getCarAboveAndBack = sender ) and chosenAction = "moveUp") [
         set val (val - dingAmount)
-        show "EM: moa moving to where I want to cutoff"     
+        show "EM: moa moving to where I want to cutoff"
       ]
     ]
     if ( getCarBelowAndBack != nobody ) [
       if( ( getCarBelowAndBack = sender) and chosenAction = "moveDown") [
         set val (val - dingAmount)
-        show "EM: moa moving to where I want to cutoff"     
-      ]   
+        show "EM: moa moving to where I want to cutoff"
+      ]
     ]
   ]
   if ( move = "cutoff" ) [
@@ -915,13 +918,16 @@ to-report getSocialArgumentEmissionValue [ arg dingAmount ]
     let receiverLaneId 0
     ask sender [
       set senderLaneId current-lane-id
+      if( chosenAction = "moveDown" ) [
+        set receiverLaneId (current-lane-id - 1)
+      ]
+      if( chosenAction = "moveUp" ) [
+        set receiverLaneId (current-lane-id + 1)
+      ]
     ]
-    ask receiver [
-      set receiverLaneId current-lane-id
-    ]    
     if( receiverLaneId > senderLaneId ) [
       set val (val - dingAmount)
-      show "EM: cutoff not moving down"     
+      show "EM: cutoff not moving down"
     ]
   ]
   if ( move = "rightOfWay" ) [
@@ -929,13 +935,16 @@ to-report getSocialArgumentEmissionValue [ arg dingAmount ]
     let receiverLaneId 0
     ask sender [
       set senderLaneId current-lane-id
+      if( chosenAction = "moveDown" ) [
+        set receiverLaneId (current-lane-id - 1)
+      ]
+      if( chosenAction = "moveUp" ) [
+        set receiverLaneId (current-lane-id + 1)
+      ]
     ]
-    ask receiver [
-      set receiverLaneId current-lane-id
-    ]   
     if( receiverLaneId > senderLaneId ) [
       set val (val - dingAmount)
-      show "EM: rightOfWay not moving down"     
+      show "EM: rightOfWay not moving down"
     ]
   ]
   report val
@@ -949,31 +958,31 @@ to-report getSocialArgumentCongestionValue [ arg dingAmount ]
   let move (item 1 arg)
   let receiver (item 2 arg)
   let val 1
-  
+
   if ( move = "moa" ) [
     ;; is the sender of the moa in my lane? We want him to get out!
     let senderLaneId 0
-    
+
     ask sender [
       set senderLaneId current-lane-id
-    ]    
-    
+    ]
+
     if ( senderLaneId = current-lane-id ) [
-      ;; he is in my lane! ding! 
+      ;; he is in my lane! ding!
       set val (val - dingAmount)
-      show "CGN: moa staying in my lane"     
+      show "CGN: moa staying in my lane"
     ]
     if ( getCarAboveAndBack != nobody ) [
       if( ( getCarAboveAndBack = sender ) and chosenAction = "moveUp") [
         set val (val - dingAmount)
-        show "CGN: moa moving to where I want to cutoff"     
+        show "CGN: moa moving to where I want to cutoff"
       ]
     ]
     if ( getCarBelowAndBack != nobody ) [
       if( ( getCarBelowAndBack = sender)and chosenAction = "moveDown") [
         set val (val - dingAmount)
-        show "CGN: moa moving to where I want to cutoff"     
-      ]   
+        show "CGN: moa moving to where I want to cutoff"
+      ]
     ]
   ]
   if ( move = "cutoff" ) [
@@ -981,10 +990,14 @@ to-report getSocialArgumentCongestionValue [ arg dingAmount ]
     let receiverLaneId 0
     ask sender [
       set senderLaneId current-lane-id
+      if( chosenAction = "moveDown" ) [
+        set receiverLaneId (current-lane-id - 1)
+      ]
+      if( chosenAction = "moveUp" ) [
+        set receiverLaneId (current-lane-id + 1)
+      ]
     ]
-    ask receiver [
-      set receiverLaneId current-lane-id
-    ]    
+
     if( receiverLaneId = current-lane-id ) [
       set val (val - dingAmount)
       show "CNG: cutoff into my lane"
@@ -1070,7 +1083,7 @@ to-report getTravelTimeActionValue [ act actionValue dingAmount ]
 end
 to resolveArguments
   ; F = <A, R, Va, Vr>
-  
+
   ; A
   let A [] ; empty list
            ; each lane change agent must generate an arg
@@ -1083,36 +1096,51 @@ to resolveArguments
   ; show "---------Before Reduction A List:----------- "
   ; show A
   ; show "---------End A List:----------- "
-  
+
   ;; Arg reduction on A, remove redundant args
   set A removeRedundantSocialArguments A
-  
+
   ; show "---------After Reduction A List:----------- "
   ; show A
   ; show "---------End A List:----------- "
-  
+
   ; R
   ;; TODO
-  
+
   ; Va
   let Va [] ; values for each argument
-  
+
   ; createArgumentVotes
   set Va generateSocialArgumentVotes A
-  
-  ; show "-----Create Relations----"
-  
-  let R createSocialArgumentRelations Va
-  
-  ; show "-----End Create Relations----"
-  
-  let Rg createSocialArgumentRelationalGroups R
-  
+
+  show "-----Create Groups ----"
+
+  let Rg generateSocialArgumentGroups Va
+
+  foreach Rg [ [g] ->
+    show "Grp"
+    show g
+  ]
+
+  show "-----End Create Groups----"
+
+  show "-----Reduce Groups ----"
+
+  let rRg reduceSocialGroups Rg
+
+  foreach rRg [ [g] ->
+    show "Grp"
+    show g
+  ]
+
+  show "-----End Reduce Groups----"
+
   if ( argumentationScheme = "socialAbstractArgumentation" ) [
-    
-    
-    
-    
+
+    ;; for every agent that did not have an accepted action, make them do the only remaining thing, decelerate
+    resolveLosers cars rRg
+
+
   ]
   if ( argumentationScheme = "dialogueArgumentation") [
 
@@ -1120,6 +1148,24 @@ to resolveArguments
   ]
 
 
+end
+to resolveLosers [ participatingVehicles acceptedVehicleVotedArgs ]
+  ask participatingVehicles [
+    let veh self
+    let isAcceptedVeh false 
+    foreach acceptedVehicleVotedArgs [ [vehVotedArg] ->
+     let acceptedVeh (item 0 (item 0 vehVotedArg) )
+     
+     if( veh = acceptedVeh) [
+        set isAcceptedVeh true 
+      ]
+    ]
+    if( NOT isAcceptedVeh ) [
+      ask veh [
+          set chosenAction "decelerate" 
+      ]
+    ]
+  ]
 end
 to-report phiFunction [ f ]
   let I (item 0 f)
@@ -1181,26 +1227,26 @@ to-report createSocialArgumentRelationalGroups [ R ]
   ;; Rg = < {group}, {group}, {group} >
   ;; R = < attacker, defender >
   let Rg []
-  
+
   while [ R != [] ] [
     let relationNumber 0
-    foreach R [ [rel] -> 
+    foreach R [ [rel] ->
       let attacker item 0 rel
       let defender item 1 rel
       let foundGroupNumber nobody
       let currentGroupNumber 0
       let newGroupMember nobody
-      
+
       ;; if defender is found within group, add attacker to that group, or vice versa
-      foreach Rg [ [group] -> 
-        foreach group [ [groupVotedArg] -> 
+      foreach Rg [ [group] ->
+        foreach group [ [groupVotedArg] ->
           if ( groupVotedArg = defender) [
-             ;; found group! 
+             ;; found group!
             set newGroupMember attacker
             set foundGroupNumber currentGroupNumber
           ]
           if ( groupVotedArg = attacker) [
-             ;; found group! 
+             ;; found group!
             set newGroupMember defender
             set foundGroupNumber currentGroupNumber
           ]
@@ -1221,17 +1267,17 @@ to-report createSocialArgumentRelationalGroups [ R ]
       ;;; end of rel
     ]
     set relationNumber (relationNumber + 1)
-    
+
     ;; end of while
   ]
-  foreach Rg [ [group] -> 
-    foreach group [ [groupVotedArg] ->  
+  foreach Rg [ [group] ->
+    foreach group [ [groupVotedArg] ->
       show "-------Begin Group-----"
       show groupVotedArg
       show "-------End Group------"
     ]
   ]
-  
+
   report Rg
 end
 to-report makeGroup [ attacker defender ]
@@ -1247,20 +1293,20 @@ to-report createSocialArgumentRelations [ votedArgs ]
   let cutoffs []
   let rightOfWays []
   ;; run through args and look for clusters of 5
-  
+
   foreach votedArgs [ [votedArg_1] ->
     ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
     let arg_1 (item 0 votedArg_1)
     let argSender_1 (item 0 arg_1 )
     let argAction_1 (item 1 arg_1 )
     let argReceiver_1 (item 2 arg_1 )
-    
-    foreach votedArgs [ [votedArg_2] -> 
+
+    foreach votedArgs [ [votedArg_2] ->
       ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
       let arg_2 (item 0 votedArg_2)
       let argSender_2 (item 0 arg_2 )
       let argAction_2 (item 1 arg_2 )
-      let argReceiver_2 (item 2 arg_2 )     
+      let argReceiver_2 (item 2 arg_2 )
       ;; if the receiver of 1 matches the sender of 2, 1 attacks 2, (1 -> 2), and vice versa
       ifelse ( argReceiver_1 = argReceiver_2 AND (argReceiver_1 = nobody) ) [
         ;; moas dont directly attack each other... for now
@@ -1275,13 +1321,13 @@ to-report createSocialArgumentRelations [ votedArgs ]
           set R lput (makeAttackRelation votedArg_1 votedArg_2) R
         ]
       ]
-      
+
     ]
-    
+
   ]
   set R remove-duplicates R
-  foreach R [ [rel] -> 
-    show "Attacker" 
+  foreach R [ [rel] ->
+    show "Attacker"
     show item 0 rel
     show "Defender"
     show item 1 rel
@@ -1297,11 +1343,11 @@ end
 to-report generateSocialArgumentVotes [ args ]
   let Va []
   show args
- 
+
   foreach args [ [arg] ->
     let forArg 0
     let againstArg 0
-    
+
     ; get votes for arg
     ask cars [ ; TODO: Could pass in a set of agents worthy of judging the args. i.e. stop the agents from voting for themselves
       ;; cant vote if we are the aggressor in the arg?
@@ -1315,8 +1361,216 @@ to-report generateSocialArgumentVotes [ args ]
     set Va lput (createArgumentVotes arg forArg againstArg) Va
   ]
   show Va
-  
+
   report Va
+end
+to-report generateSocialArgumentGroups [ votedArgs ]
+  let tmpList []
+  let moas []
+  let cutoffs []
+  let rightOfWays []
+  let groups []
+
+  ;; SEPARATE THE TYPES OF ARGUMENTS
+
+  foreach votedArgs [ [votedArg_1] ->
+    ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+    let arg_1 (item 0 votedArg_1)
+    let argSender_1 (item 0 arg_1 )
+    let argAction_1 (item 1 arg_1 )
+    let argReceiver_1 (item 2 arg_1 )
+
+    if ( argAction_1 = "moa" ) [
+      set moas lput votedArg_1 moas
+    ]
+    if ( argAction_1 = "cutoff" ) [
+      set cutoffs lput votedArg_1 cutoffs
+    ]
+    if ( argAction_1 = "rightOfWay" ) [
+      set rightOfWays lput votedArg_1 rightOfWays
+    ]
+  ]
+
+  ;; HANDLE ALL MOA
+
+  foreach moas [ [moaArg] ->
+    ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+    let arg_1 (item 0 moaArg)
+    let argSender_1 (item 0 arg_1 )
+    let argAction_1 (item 1 arg_1 )
+    let argReceiver_1 (item 2 arg_1 )
+    let group []
+    ;; ADD MOA TO GROUP, ADD ANY CUTOFFS ASSOCIATED WITH MOA TO SAME GROUP
+    set group lput moaArg group
+
+    foreach cutoffs [ [cutoffArg] ->
+      ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+      let arg_2 (item 0 cutoffArg)
+      let argSender_2 (item 0 arg_2 )
+      let argAction_2 (item 1 arg_2 )
+      let argReceiver_2 (item 2 arg_2 )
+
+      ;; RELATION TO MOA FOUND THROUGH THE RECEIVER OF THE CUTOFF TO BE THE SAME AS SENDER OF THE MOA
+
+      if ( argReceiver_2 = argSender_1 ) [
+       ;; relation, add to current group
+        set group lput cutoffArg group
+        set cutoffs remove cutoffArg cutoffs
+      ]
+    ]
+    set groups lput group groups
+  ]
+  ;;; moas are handled
+  set moas []
+
+
+
+
+
+  ;; HANDLE ANY CUTOFFS (THE CUTOFFS AT THIS POINT INCLUDE THOSE WITH NO ASSOCIATIVE MOAS)
+
+  ;; IF THE CUTOFF HAS A CORRESPONDING RIGHTOFWAY, REMOVE THE CUTOFF
+
+  ;; IF THE CUTOFF HAS NO ROW OR MOA, MAKE IT ITS OWN GROUP
+  foreach cutoffs [ [cutoffArg] ->
+    ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+    let arg_1 (item 0 cutoffArg)
+    let argSender_1 (item 0 arg_1 )
+    let argAction_1 (item 1 arg_1 )
+    let argReceiver_1 (item 2 arg_1 )
+    let group []
+    let removeCutoff false
+
+    foreach rightOfWays [ [rightOfWayArg] ->
+      ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+      let arg_2 (item 0 rightOfWayArg)
+      let argSender_2 (item 0 arg_2 )
+      let argAction_2 (item 1 arg_2 )
+      let argReceiver_2 (item 2 arg_2 )
+
+      ;; IF THE CUTOFF HAS A CORRESPONDING RIGHTOFWAY, REMOVE THE CUTOFF
+      ;; (this occurs when the sender of the cutoff and the sender of the rightOfWay are the same)
+
+      if ( argSender_2 = argSender_1 ) [
+       ;; remove this redundant cutoff
+        set removeCutoff true
+      ]
+    ]
+
+    ifelse ( removeCutoff = true ) [
+      ;; IF THE CUTOFF HAS A CORRESPONDING RIGHTOFWAY, REMOVE THE CUTOFF
+      set cutoffs remove cutoffArg cutoffs
+    ] [
+      ;; IF THE CUTOFF HAS NO ROW OR MOA, MAKE IT ITS OWN GROUP
+      set group lput cutoffArg group
+      set groups lput group groups
+      set cutoffs remove cutoffArg cutoffs
+    ]
+  ]
+
+  ;; all cutoffs and moas are handled
+  ;; take care of all connected rightOfWays
+
+  foreach rightOfWays [ [rightOfWayArg_1] ->
+    ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+    let arg_1 (item 0 rightOfWayArg_1)
+    let argSender_1 (item 0 arg_1 )
+    let argAction_1 (item 1 arg_1 )
+    let argReceiver_1 (item 2 arg_1 )
+    let group []
+
+    set group lput rightOfWayArg_1 group
+
+    foreach rightOfWays [ [rightOfWayArg_2] ->
+      ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+      let arg_2 (item 0 rightOfWayArg_2)
+      let argSender_2 (item 0 arg_2 )
+      let argAction_2 (item 1 arg_2 )
+      let argReceiver_2 (item 2 arg_2 )
+
+      ;; rightOfWays are connected when: recv1 = sender2 AND recv2 = sender1
+      if( argReceiver_1 = argSender_2 AND argReceiver_2 = argSender_1 ) [
+        set group lput rightOfWayArg_2 group
+      ]
+    ]
+    ;; is there a group that is the same as this but backwards?
+    ifelse ( groupsHasGroup groups group ) [
+
+    ] [
+      set groups lput group groups
+    ]
+  ]
+  report groups
+end
+to-report groupsHasGroup [groups group]
+  let reportVal false
+  foreach groups [ [grp] ->
+    if ( length grp > 1 ) [
+      let elem11 (item 0 grp)
+      let elem12 (item 1 grp)
+      let elem21 (item 0 group)
+      let elem22 (item 1 group)
+
+      if( elem11 = elem22 AND elem12 = elem21 ) [
+        set reportVal true
+      ]
+    ]
+  ]
+  report reportVal
+end
+to-report listHasItem [ l i ]
+  foreach l [ [it] ->
+    show "SearchItem"
+    show i
+    show "List Item"
+    show it
+    if( it = i ) [
+      report true
+    ]
+  ]
+  report false
+end
+to-report reduceSocialGroups [ groups ]
+  let reducedGroups []
+
+  foreach groups [ [group] ->
+    let maxApproval nobody
+    let acceptedArg nobody
+    let tieApproval nobody
+
+    foreach group [ [votedArg] ->
+      ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+      let arg (item 0 votedArg)
+      let Vfor (item 1 votedArg )
+      let Vagainst (item 2 votedArg )
+
+      let approval (Vfor - Vagainst)
+
+      ifelse ( maxApproval = nobody ) [
+        set maxApproval approval
+        set acceptedArg votedArg
+      ] [
+        ifelse ( approval > maxApproval) [
+          set maxApproval approval
+          set acceptedArg votedArg
+        ] [
+          if ( approval = maxApproval ) [
+            ;; we have a tie at this ratio
+            set tieApproval approval
+          ]
+        ]
+      ]
+    ]
+
+    ifelse ( tieApproval = nobody ) [
+      set reducedGroups lput acceptedArg reducedGroups
+    ] [
+      if( tieApproval < maxApproval ) [
+        set reducedGroups lput acceptedArg reducedGroups
+      ]
+    ]
+  ]
+  report reducedGroups
 end
 to-report createArgumentVotes [ arg for against ]
   ; V = <arg, for, against>
@@ -1332,7 +1586,7 @@ to-report removeRedundantSocialArguments [ args ]
   let cutoffs []
   let rightOfWays []
   ;; run through args and look for clusters of 5
-  
+
   foreach args [ [arg] ->
     ; Arg = <actingAgent, action, receivingAgent>
     if ( (item 1 arg) = "moa" ) [
@@ -1340,31 +1594,31 @@ to-report removeRedundantSocialArguments [ args ]
     ]
     if ( (item 1 arg) = "cutoff" ) [
       set cutoffs lput arg cutoffs
-    ] 
+    ]
     if ( (item 1 arg) = "rightOfWay" ) [
       set rightOfWays lput arg rightOfWays
-    ]  
+    ]
   ]
   ;; if any cutoffs have their recipient as the sender of an moa arg, go ahead and remove any rightOfWay arg that has the same sender as the cutoff arg
   foreach cutoffs [ [cutoffArg] ->
     foreach moas [ [moaArg] ->
       ; Arg = <actingAgent, action, receivingAgent>
-      
+
       ;; is the cutoff recipient a sender of an moa?
       if ( (item 2 cutoffArg) = (item 0 moaArg) ) [
-        
+
         ;; if so, find any rightOfWay arg that have this cutoffs sender as the rightOfWay arg sender
         foreach rightOfWays [ [rightOfWayArg] ->
           if ( (item 0 rightOfWayArg) = (item 0 cutoffArg) ) [
             ;; remove this arg from the rightOfWayArg list
-            set rightOfWays remove-item (position rightOfWayArg rightOfWays) rightOfWays 
+            set rightOfWays remove-item (position rightOfWayArg rightOfWays) rightOfWays
           ]
-        ] 
-      ]  
+        ]
+      ]
     ]
-  ]  
+  ]
   set args (sentence cutoffs moas rightOfWays)
-  
+
   report args
 end
 to-report generateInitialSocialArguments ; car procedure
@@ -1372,19 +1626,23 @@ to-report generateInitialSocialArguments ; car procedure
   let cutoffArg nobody
   let moaArg nobody ; maintainOrAccellerate arg
   let argList []
-  
+
   ; cutoff and right of way
   if ( chosenAction = "moveDown" ) [
-    if (getCarBelowAndBack != nobody) [
+    ifelse (getCarBelowAndBack != nobody) [
       set cutoffArg createSocialArgument self "cutoff" getCarBelowAndBack
+    ] [
+      set cutoffArg createSocialArgument self "cutoff" nobody
     ]
   ]
-  
+
   if ( chosenAction = "moveUp" ) [
-    
+
     ; is there anyone below and back?
-    if (getCarAboveAndBack != nobody) [
+    ifelse (getCarAboveAndBack != nobody) [
       set cutoffArg createSocialArgument self "cutoff" getCarAboveAndBack
+    ]  [
+      set cutoffArg createSocialArgument self "cutoff" nobody
     ]
   ]
   if ( chosenAction = "moveDown" OR chosenAction = "moveUp" ) [
@@ -1392,27 +1650,27 @@ to-report generateInitialSocialArguments ; car procedure
       set acrossArg createSocialArgument self "rightOfWay" getCarAcrossFromMe
     ]
   ]
-  
+
   if ( chosenAction = "maintainSpeed" OR chosenAction = "accelerate" ) [
     set moaArg createSocialArgument self "moa" nobody
   ]
-  
+
   if( moaArg != nobody ) [
     set argList lput moaArg argList
   ]
-  
+
   if( acrossArg != nobody ) [
     set argList lput acrossArg argList
   ]
   if( cutoffArg != nobody) [
     set argList lput cutoffArg argList
   ]
-  
+
   ;show "---------Arg List:----------- "
   ;show argList
   ;show "---------End Arg List:----------- "
-  
-  
+
+
   report argList
 end
 to-report createSocialArgument [ actingAgent act receivingAgent ]
@@ -1444,7 +1702,7 @@ to-report generateLaneChangeRequests ; car procedure
       ]
     ]
     if ( chosenAction = "moveUp" ) [
-      
+
       ; is there anyone below and back?
       if (getCarAboveAndBack != nobody) [
         ; A = <move, sender, receiver>
@@ -2027,92 +2285,92 @@ to setup-testCars
   setup-testTraffic 90
 end
 to setup-testTraffic [ direction ]
-  
+
   let WxPos 2
   let XxPos 5
-  
+
   let RxPos 2
   let YxPos 4
-  
+
   let QxPos 2
   let ZxPos 5
 
   let W 0
   let X 0
-  
+
   let R 0
   let Y 0
-  
+
   let Q 0
   let Z 0
-  
+
   ;; X
-  create-cars 1 [ 
+  create-cars 1 [
     initializeCarParameters
     set currentPriority "congestion"
     set color brown
     ; give random cooperativeness-rating
     set cooperativeness-rating (random 10 + 1)
-    
+
     set heading direction
     set label who
-    
+
     let chosenLaneYPos 0
-    
+
     set chosenLaneYPos lane-fast-ypos
     set current-lane-id lane-fast-id
-    
+
     set next-lane-id current-lane-id ; make him stay where he is for now
-    
+
     setxy XxPos chosenLaneYPos
     set X self
   ]
-  
+
   ;; W
-  create-cars 1 [ 
+  create-cars 1 [
     initializeCarParameters
     set currentPriority "congestion"
     set color brown
     ; give random cooperativeness-rating
     set cooperativeness-rating (random 10 + 1)
-    
+
     set heading direction
     set label who
-    
+
     let chosenLaneYPos 0
-    
+
     set chosenLaneYPos lane-fast-ypos
     set current-lane-id lane-fast-id
-    
+
     set next-lane-id current-lane-id ; make him stay where he is for now
-    
+
     setxy WxPos chosenLaneYPos
     set W self
   ]
-  
+
   ;; Y
-  create-cars 1 [ 
+  create-cars 1 [
     initializeCarParameters
     set currentPriority "travelTime"
     set color red
     ; give random cooperativeness-rating
     set cooperativeness-rating (random 10 + 1)
-    
+
     set heading direction
     set label who
-    
+
     let chosenLaneYPos 0
-    
+
     set chosenLaneYPos lane-medium-ypos
     set current-lane-id lane-medium-id
-    
+
     set next-lane-id current-lane-id ; make him stay where he is for now
-    
+
     setxy YxPos chosenLaneYPos
     set Y self
   ]
   ;; R
-  create-cars 1 [ 
+  create-cars 1 [
     initializeCarParameters
     set currentPriority "congestion"
     set color brown
@@ -2121,20 +2379,20 @@ to setup-testTraffic [ direction ]
 
     set heading direction
     set label who
-    
+
     let chosenLaneYPos 0
-    
+
     set chosenLaneYPos lane-medium-ypos
     set current-lane-id lane-medium-id
 
     set next-lane-id current-lane-id ; make him stay where he is for now
-    
+
     setxy RxPos chosenLaneYPos
     set R self
-  ]  
-  
+  ]
+
   ;; Z
-  create-cars 1 [ 
+  create-cars 1 [
     initializeCarParameters
     set currentPriority "travelTime"
     set color red
@@ -2143,20 +2401,20 @@ to setup-testTraffic [ direction ]
 
     set heading direction
     set label who
-    
+
     let chosenLaneYPos 0
-    
+
     set chosenLaneYPos lane-slow-ypos
     set current-lane-id lane-slow-id
 
     set next-lane-id current-lane-id ; make him stay where he is for now
-    
+
     setxy ZxPos chosenLaneYPos
     set Z self
   ]
-  
+
   ;; Q
-  create-cars 1 [ 
+  create-cars 1 [
     initializeCarParameters
     set currentPriority "emission"
     set color green
@@ -2165,50 +2423,50 @@ to setup-testTraffic [ direction ]
 
     set heading direction
     set label who
-    
+
     let chosenLaneYPos 0
-    
+
     set chosenLaneYPos lane-slow-ypos
     set current-lane-id lane-slow-id
-    
+
     set next-lane-id current-lane-id ; make him stay where he is for now
-    
+
     setxy QxPos chosenLaneYPos
     set Q self
   ]
   update-lanes ; lanes need to know their parameters before the cars can ask them about it!
   updateWorldEmission
-  
-  
-  
+
+
+
   ask cars [
     determineFeasibleActions
     decideBestAction
   ]
 
   ; W X R Y Q Z
-  
+
   ask W [
-    set chosenAction "maintainSpeed" 
+    set chosenAction "maintainSpeed"
   ]
   ask X [
     set laneChange true
-    set chosenAction "moveDown" 
+    set chosenAction "moveDown"
   ]
   ask R [
-    set chosenAction "maintainSpeed" 
+    set chosenAction "maintainSpeed"
   ]
   ask Y [
-    set chosenAction "maintainSpeed" 
+    set chosenAction "maintainSpeed"
   ]
   ask Q [
-    set chosenAction "maintainSpeed" 
+    set chosenAction "maintainSpeed"
   ]
   ask Z [
     set laneChange true
-    set chosenAction "moveUp" 
+    set chosenAction "moveUp"
   ]
-  
+
 end
 to setup-traffic [ direction ]
   let laneOneAmount 0
