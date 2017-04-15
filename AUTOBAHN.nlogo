@@ -1080,16 +1080,16 @@ to resolveArguments
       set A lput newArg A
     ]
   ]
-  show "---------Before Reduction A List:----------- "
-  show A
-  show "---------End A List:----------- "
+  ; show "---------Before Reduction A List:----------- "
+  ; show A
+  ; show "---------End A List:----------- "
   
   ;; Arg reduction on A, remove redundant args
   set A removeRedundantSocialArguments A
   
-  show "---------After Reduction A List:----------- "
-  show A
-  show "---------End A List:----------- "
+  ; show "---------After Reduction A List:----------- "
+  ; show A
+  ; show "---------End A List:----------- "
   
   ; R
   ;; TODO
@@ -1099,6 +1099,14 @@ to resolveArguments
   
   ; createArgumentVotes
   set Va generateSocialArgumentVotes A
+  
+  ; show "-----Create Relations----"
+  
+  let R createSocialArgumentRelations Va
+  
+  ; show "-----End Create Relations----"
+  
+  let Rg createSocialArgumentRelationalGroups R
   
   if ( argumentationScheme = "socialAbstractArgumentation" ) [
     
@@ -1169,7 +1177,123 @@ to-report createFramework [vehicles n]
   set tmpF lput n tmpF
   report tmpF
 end
-
+to-report createSocialArgumentRelationalGroups [ R ]
+  ;; Rg = < {group}, {group}, {group} >
+  ;; R = < attacker, defender >
+  let Rg []
+  
+  while [ R != [] ] [
+    let relationNumber 0
+    foreach R [ [rel] -> 
+      let attacker item 0 rel
+      let defender item 1 rel
+      let foundGroupNumber nobody
+      let currentGroupNumber 0
+      let newGroupMember nobody
+      
+      ;; if defender is found within group, add attacker to that group, or vice versa
+      foreach Rg [ [group] -> 
+        foreach group [ [groupVotedArg] -> 
+          if ( groupVotedArg = defender) [
+             ;; found group! 
+            set newGroupMember attacker
+            set foundGroupNumber currentGroupNumber
+          ]
+          if ( groupVotedArg = attacker) [
+             ;; found group! 
+            set newGroupMember defender
+            set foundGroupNumber currentGroupNumber
+          ]
+        ]
+        set currentGroupNumber (currentGroupNumber + 1)
+        ;; end of group
+      ]
+      ifelse (foundGroupNumber != nobody ) [
+        ;; we found our group!
+        let foundGroup (item foundGroupNumber Rg)
+        set foundGroup lput newGroupMember foundGroup
+        set Rg replace-item foundGroupNumber Rg foundGroup
+        set R remove-item relationNumber R
+      ] [
+        let tmpGroup makeGroup attacker defender
+        set Rg lput tmpGroup Rg
+      ]
+      ;;; end of rel
+    ]
+    set relationNumber (relationNumber + 1)
+    
+    ;; end of while
+  ]
+  foreach Rg [ [group] -> 
+    foreach group [ [groupVotedArg] ->  
+      show "-------Begin Group-----"
+      show groupVotedArg
+      show "-------End Group------"
+    ]
+  ]
+  
+  report Rg
+end
+to-report makeGroup [ attacker defender ]
+  let g []
+  set g lput attacker g
+  set g lput defender g
+  report g
+end
+to-report createSocialArgumentRelations [ votedArgs ]
+  let R []
+  let tmpList []
+  let moas []
+  let cutoffs []
+  let rightOfWays []
+  ;; run through args and look for clusters of 5
+  
+  foreach votedArgs [ [votedArg_1] ->
+    ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+    let arg_1 (item 0 votedArg_1)
+    let argSender_1 (item 0 arg_1 )
+    let argAction_1 (item 1 arg_1 )
+    let argReceiver_1 (item 2 arg_1 )
+    
+    foreach votedArgs [ [votedArg_2] -> 
+      ; Voted Arg = < <actingAgent, action, receivingAgent>, V for, V against >
+      let arg_2 (item 0 votedArg_2)
+      let argSender_2 (item 0 arg_2 )
+      let argAction_2 (item 1 arg_2 )
+      let argReceiver_2 (item 2 arg_2 )     
+      ;; if the receiver of 1 matches the sender of 2, 1 attacks 2, (1 -> 2), and vice versa
+      ifelse ( argReceiver_1 = argReceiver_2 AND (argReceiver_1 = nobody) ) [
+        ;; moas dont directly attack each other... for now
+      ] [
+        if( argReceiver_1 = argSender_2 ) [
+          set R lput (makeAttackRelation votedArg_1 votedArg_2) R
+          set R lput (makeAttackRelation votedArg_2 votedArg_1) R
+        ]
+        if( votedArg_2 != votedArg_1 AND ( argReceiver_1 = argReceiver_2 ) ) [
+          ;; they both are cutting off the same arg, so, they have a conflict
+          set R lput (makeAttackRelation votedArg_2 votedArg_1) R
+          set R lput (makeAttackRelation votedArg_1 votedArg_2) R
+        ]
+      ]
+      
+    ]
+    
+  ]
+  set R remove-duplicates R
+  foreach R [ [rel] -> 
+    show "Attacker" 
+    show item 0 rel
+    show "Defender"
+    show item 1 rel
+  ]
+  report R
+end
+to-report makeAttackRelation [ attacker defender ]
+  let r []
+  set r lput attacker r
+  set r lput defender r
+  report r
+end
 to-report generateSocialArgumentVotes [ args ]
   let Va []
   show args
@@ -1180,7 +1304,7 @@ to-report generateSocialArgumentVotes [ args ]
     
     ; get votes for arg
     ask cars [ ; TODO: Could pass in a set of agents worthy of judging the args. i.e. stop the agents from voting for themselves
-      ;; cant vote if we are the aggressor in the arg
+      ;; cant vote if we are the aggressor in the arg?
       ifelse ( (getActionApproval arg) = VOTE_FOR ) [
         set forArg (forArg + 1)
       ] [
